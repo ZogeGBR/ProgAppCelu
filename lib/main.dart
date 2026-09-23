@@ -31,16 +31,44 @@ class _AppRootState extends State<AppRoot> {
   }
 
   @override
+  void dispose() {
+    _carrito.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF2E7D32), // verde, "buena onda"
+      brightness: Brightness.light,
+    );
+
     return MaterialApp(
       title: 'FreshMarket',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32), // verde, "buena onda"
-          brightness: Brightness.light,
-        ),
+        colorScheme: colorScheme,
         useMaterial3: true,
+        scaffoldBackgroundColor: colorScheme.surfaceContainerLowest,
+        appBarTheme: AppBarTheme(
+          backgroundColor: colorScheme.surfaceContainerLowest,
+          surfaceTintColor: Colors.transparent,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ),
       // El carrito se pasa por constructor de pantalla en pantalla
       // (prop drilling), tal como lo venimos viendo en clase con el

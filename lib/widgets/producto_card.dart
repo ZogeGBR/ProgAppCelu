@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/producto.dart';
+import '../utils/formato.dart';
+import 'selector_cantidad.dart';
 
 /// Tarjeta de un producto del catálogo.
 ///
@@ -23,45 +25,64 @@ class ProductoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: CircleAvatar(
-          radius: 26,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Text(producto.emoji, style: const TextStyle(fontSize: 24)),
-        ),
-        title: Text(
-          producto.nombre,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '\$${producto.precio.toStringAsFixed(0)} · ${producto.categoria}',
-        ),
-        trailing: cantidadEnCarrito == 0
-            ? FilledButton(
-                onPressed: onAgregar,
-                child: const Text('Agregar'),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withAlpha(120),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(producto.emoji, style: const TextStyle(fontSize: 28)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    onPressed: onQuitar,
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
                   Text(
-                    '$cantidadEnCarrito',
+                    producto.nombre,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  IconButton(
-                    onPressed: onAgregar,
-                    icon: const Icon(Icons.add_circle_outline),
+                  const SizedBox(height: 2),
+                  Text(
+                    producto.categoria,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formatearPrecio(producto.precio),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            cantidadEnCarrito == 0
+                ? FilledButton.tonalIcon(
+                    onPressed: onAgregar,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Agregar'),
+                  )
+                : SelectorCantidad(
+                    cantidad: cantidadEnCarrito,
+                    onSumar: onAgregar,
+                    onRestar: onQuitar,
+                  ),
+          ],
+        ),
       ),
     );
   }

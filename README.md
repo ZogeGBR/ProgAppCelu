@@ -6,38 +6,73 @@ de Aplicaciones para Celulares*, a partir de la entrevista a Don Ceferino
 
 ## Cómo abrir el proyecto
 
-Esta carpeta contiene solo el código fuente (`pubspec.yaml` + `lib/`), que es
-lo que se edita a mano. Los proyectos nativos (`android/`, `ios/`, etc.) los
-genera Flutter automáticamente:
+El repo ya incluye las carpetas `android/` e `ios/`, así que se abre directo:
 
-1. Creá un proyecto nuevo vacío: `flutter create freshmarket_app`
-2. Reemplazá el `pubspec.yaml` generado y la carpeta `lib/` por los de esta
-   entrega.
-3. `flutter pub get`
-4. `flutter run`
+1. **Android Studio** → *File → Open* → elegir esta carpeta (la que tiene el
+   `pubspec.yaml`). Hacen falta los plugins **Flutter** y **Dart**.
+2. Si no lo hace solo, correr `flutter pub get` (o el botón *Pub get* que
+   aparece arriba del `pubspec.yaml`).
+3. Elegir un emulador o celular y darle ▶ Run (o `flutter run`).
 
-(También podés abrir esta carpeta directamente en Android Studio/VS Code y
-usar **"New Flutter Project" → importar**, según qué versión del IDE tengas.)
+Tests: `flutter test`.
+
+> **Ojo con la ruta en Windows:** si la carpeta tiene tildes o símbolos
+> (por ej. `5° Semestre\Programación...`), el Android Gradle Plugin corta
+> el build. Por eso `android/gradle.properties` tiene
+> `android.overridePathCheck=true`. Además, el analizador de Dart se cuelga
+> con esas rutas (el IDE deja de marcar errores). Si pasa, copiar el
+> proyecto a una ruta sin tildes (por ej. `C:\dev\freshmarket`).
 
 ## Estructura
 
 ```
 lib/
-├── main.dart                     ← punto de entrada (AppRoot)
+├── main.dart                     ← punto de entrada (AppRoot) + tema
 ├── models/
 │   ├── producto.dart              ← modelo Producto + catálogo de ejemplo
 │   ├── item_carrito.dart          ← producto + cantidad dentro del carrito
+│   ├── pedido.dart                ← pedido confirmado ("foto" del carrito)
+│   ├── metodo_pago.dart           ← enum Tarjeta / Mercado Pago
 │   └── estado_pedido.dart         ← enum de estados del seguimiento
 ├── providers/
 │   └── carrito_provider.dart      ← estado del carrito (ChangeNotifier)
+├── utils/
+│   └── formato.dart               ← formatearPrecio(): 3800 -> "$3.800"
 ├── widgets/
-│   └── producto_card.dart         ← tarjeta de producto (patrón callbacks)
+│   ├── producto_card.dart         ← tarjeta de producto (patrón callbacks)
+│   └── selector_cantidad.dart     ← control − 2 + reutilizable
 └── screens/
-    ├── home_screen.dart           ← catálogo
-    ├── carrito_screen.dart        ← carrito y total
-    ├── metodo_pago_screen.dart    ← elegir tarjeta / Mercado Pago (mock)
-    └── seguimiento_screen.dart    ← estados del pedido (simulado)
+    ├── home_screen.dart           ← catálogo con búsqueda y categorías
+    ├── carrito_screen.dart        ← carrito: cantidades, borrar, total
+    ├── metodo_pago_screen.dart    ← resumen + elegir pago (mock)
+    └── seguimiento_screen.dart    ← línea de tiempo del pedido (simulado)
+test/
+├── carrito_provider_test.dart     ← tests del carrito y del formato de precio
+└── widget_test.dart               ← tests de pantalla (flujo completo)
 ```
+
+## Cambios de la V2
+
+- **Listo para Android Studio**: se generaron `android/` e `ios/`,
+  `.gitignore` y `analysis_options.yaml`. Nombre visible: "FreshMarket".
+- **Bug corregido**: el carrito se vaciaba en el `initState()` del
+  seguimiento, lo que avisaba a la Home *mientras* Flutter construía la
+  pantalla nueva ("setState() called during build"). Ahora el pedido se
+  confirma en el botón de pagar con `CarritoProvider.confirmarPedido()`.
+- **Catálogo**: buscador, filtro por categoría (`ChoiceChip`), botón
+  flotante "Ver pedido · cantidad · total" y precios con separador de miles.
+- **Carrito**: cambiar cantidades con − / +, deslizar para eliminar
+  (`Dismissible`), vaciar con confirmación y estado vacío con acceso al
+  catálogo.
+- **Pago**: resumen del pedido, opciones de pago más claras y un "Procesando
+  pago..." simulado de 2 s (con chequeo de `mounted` después del `await`).
+- **Seguimiento**: número de pedido, línea de tiempo por etapas, resumen de
+  lo pagado y botón "Hacer otro pedido" al entregarse. Al volver atrás se
+  cae en el catálogo (`pushAndRemoveUntil`), no en un carrito vacío.
+- **Tests**: 9 tests (unitarios del carrito + flujo completo de pantallas).
+
+Todo sigue sin paquetes externos, con `ChangeNotifier` + `ListenableBuilder`
+y el patrón de callbacks, como se vio en clase.
 
 ## De la entrevista al código
 

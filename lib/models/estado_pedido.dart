@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Estados posibles de un pedido en curso.
 ///
 /// Don Ceferino pidió poder ver "como el GPS de un taxi" en qué va
@@ -36,6 +38,19 @@ extension EstadoPedidoInfo on EstadoPedido {
         return 'El repartidor va para tu casa.';
       case EstadoPedido.entregado:
         return 'Que lo disfrutes.';
+    }
+  }
+
+  IconData get icono {
+    switch (this) {
+      case EstadoPedido.recibido:
+        return Icons.receipt_long;
+      case EstadoPedido.enPreparacion:
+        return Icons.storefront;
+      case EstadoPedido.enCamino:
+        return Icons.delivery_dining;
+      case EstadoPedido.entregado:
+        return Icons.check_circle;
     }
   }
 
