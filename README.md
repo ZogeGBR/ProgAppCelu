@@ -1,106 +1,145 @@
 # FreshMarket — App de pedidos para el almacén de Don Ceferino
 
-Proyecto base en **Flutter/Dart** para el trabajo práctico de *Programación
-de Aplicaciones para Celulares*, a partir de la entrevista a Don Ceferino
-(dueño de FreshMarket, almacén de barrio).
+App **Flutter/Dart** del trabajo práctico de *Programación de Aplicaciones
+para Celulares* (ITU), a partir de la entrevista a Don Ceferino, dueño de
+FreshMarket (almacén de barrio).
 
-## Cómo abrir el proyecto
+**Versión 3:** arquitectura en capas (MVVM), mapa con el repartidor en
+bicicleta en tiempo real, carga de productos con una foto (IA), pagos con
+Mercado Pago (débito, crédito y dinero en cuenta) y una navegación pensada
+para personas que no usan mucho el celular. El detalle de qué se mejoró y
+qué falta está en [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
 
-El repo ya incluye las carpetas `android/` e `ios/`, así que se abre directo:
+## Cómo correrlo
 
-1. **Android Studio** → *File → Open* → elegir esta carpeta (la que tiene el
-   `pubspec.yaml`). Hacen falta los plugins **Flutter** y **Dart**.
-2. Si no lo hace solo, correr `flutter pub get` (o el botón *Pub get* que
-   aparece arriba del `pubspec.yaml`).
-3. Elegir un emulador o celular y darle ▶ Run (o `flutter run`).
+### 1. Solo la app (modo demo, sin claves)
 
-Tests: `flutter test`.
+```bash
+flutter pub get
+flutter run
+```
+
+Sin configuración, todo funciona **simulado**: catálogo de ejemplo, pago
+que se aprueba solo, repartidor que recorre el centro de Mendoza y una IA
+que devuelve una etiqueta de ejemplo. La cámara sí es real.
+
+### 2. App + backend (pagos y mapa reales)
+
+```bash
+cd backend
+npm install
+cp .env.example .env      # completar las claves (ver abajo)
+node --env-file=.env src/server.js
+```
+
+En otra terminal, desde la raíz del proyecto:
+
+```bash
+# Emulador de Android: 10.0.2.2 es "localhost" de la PC.
+flutter run --dart-define=URL_BACKEND=http://10.0.2.2:3000
+```
+
+| Variable (`backend/.env`) | Para qué | Sin ella |
+|---|---|---|
+| `MP_ACCESS_TOKEN` | Crear pagos reales en Mercado Pago (usar credenciales **de prueba** para desarrollar) | Pago simulado: se abre una página que lo aprueba |
+| `MP_WEBHOOK_SECRET` | Validar la firma de los avisos de Mercado Pago | No se valida la firma |
+| `URL_PUBLICA` | URL **https** del backend, para que Mercado Pago avise y vuelva a la app | La app igual consulta el estado cada 3 s |
+| `GEMINI_API_KEY` | Reconocer productos con IA (Google AI Studio) | Etiqueta de ejemplo |
+| `CLAVE_REPARTIDOR` | Que solo la app del repartidor pueda mandar su posición | Cualquiera puede mandarla |
+
+> **Seguridad:** ninguna clave va en la app Flutter. La app solo conoce
+> `URL_BACKEND`. El backend recalcula el total con sus propios precios,
+> así que nadie puede pagar menos modificando la app.
+
+Para ocultar la sección del dueño en la versión para clientes:
+`--dart-define=MODO_DUENO=false`.
+
+### Pruebas y calidad
+
+```bash
+dart format .
+flutter analyze
+flutter test           # app: ViewModels con fakes + flujo completo
+cd backend && npm test # backend: 12 pruebas
+```
 
 > **Ojo con la ruta en Windows:** si la carpeta tiene tildes o símbolos
 > (por ej. `5° Semestre\Programación...`), el Android Gradle Plugin corta
 > el build. Por eso `android/gradle.properties` tiene
-> `android.overridePathCheck=true`. Además, el analizador de Dart se cuelga
-> con esas rutas (el IDE deja de marcar errores). Si pasa, copiar el
+> `android.overridePathCheck=true`. Si el analizador se cuelga, copiar el
 > proyecto a una ruta sin tildes (por ej. `C:\dev\freshmarket`).
 
-## Estructura
+## Estructura (arquitectura en capas)
 
 ```
 lib/
-├── main.dart                     ← punto de entrada (AppRoot) + tema
-├── models/
-│   ├── producto.dart              ← modelo Producto + catálogo de ejemplo
-│   ├── item_carrito.dart          ← producto + cantidad dentro del carrito
-│   ├── pedido.dart                ← pedido confirmado ("foto" del carrito)
-│   ├── metodo_pago.dart           ← enum Tarjeta / Mercado Pago
-│   └── estado_pedido.dart         ← enum de estados del seguimiento
-├── providers/
-│   └── carrito_provider.dart      ← estado del carrito (ChangeNotifier)
-├── utils/
-│   └── formato.dart               ← formatearPrecio(): 3800 -> "$3.800"
-├── widgets/
-│   ├── producto_card.dart         ← tarjeta de producto (patrón callbacks)
-│   └── selector_cantidad.dart     ← control − 2 + reutilizable
-└── screens/
-    ├── home_screen.dart           ← catálogo con búsqueda y categorías
-    ├── carrito_screen.dart        ← carrito: cantidades, borrar, total
-    ├── metodo_pago_screen.dart    ← resumen + elegir pago (mock)
-    └── seguimiento_screen.dart    ← línea de tiempo del pedido (simulado)
-test/
-├── carrito_provider_test.dart     ← tests del carrito y del formato de precio
-└── widget_test.dart               ← tests de pantalla (flujo completo)
+├── main.dart                    ← crea los ViewModels una vez y arma la app
+├── config/
+│   └── dependencias.dart        ← ÚNICO lugar donde se elige real o simulado
+├── domain/models/               ← datos puros: Producto, Pedido, Posicion...
+├── data/
+│   ├── services/                ← hablan con afuera, sin estado
+│   │   ├── api_client.dart          (HTTP con tiempo límite)
+│   │   ├── catalogo_service.dart    (backend / local)
+│   │   ├── pago_service.dart        (Mercado Pago vía backend / simulado)
+│   │   ├── seguimiento_service.dart (backend cada 3 s / simulado)
+│   │   ├── etiquetado_service.dart  (IA vía backend / simulada)
+│   │   └── camara_service.dart      (image_picker)
+│   └── repositories/            ← JSON → modelo, caché, reintentos, esperas
+└── ui/
+    ├── core/                    ← tema accesible, formato de precios, VistaMensaje
+    ├── inicio/                  ← barra de abajo (NavegacionViewModel)
+    ├── catalogo/                ← "Comprar"
+    ├── carrito/                 ← "Mi carrito" (CarritoViewModel)
+    ├── pago/                    ← pago con Mercado Pago
+    ├── seguimiento/             ← "Mi pedido" con el mapa del repartidor
+    └── escaner/                 ← "Cargar": producto nuevo con una foto
+backend/                         ← Node + Express (claves, pagos, IA, reparto)
+test/                            ← pruebas con fakes (sin internet)
 ```
 
-## Cambios de la V2
+```
+Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
+      ▲  escucha (ListenableBuilder)        │
+      └─────────────────────────────────────┘
+                                            ▼
+                                     Repositorio  (caché, reintento, conversión)
+                                            ▼
+                                       Servicio    (red, cámara; sin estado)
+                                            ▼
+                         Backend propio ──▶ Mercado Pago / Gemini / repartidor
+```
 
-- **Listo para Android Studio**: se generaron `android/` e `ios/`,
-  `.gitignore` y `analysis_options.yaml`. Nombre visible: "FreshMarket".
-- **Bug corregido**: el carrito se vaciaba en el `initState()` del
-  seguimiento, lo que avisaba a la Home *mientras* Flutter construía la
-  pantalla nueva ("setState() called during build"). Ahora el pedido se
-  confirma en el botón de pagar con `CarritoProvider.confirmarPedido()`.
-- **Catálogo**: buscador, filtro por categoría (`ChoiceChip`), botón
-  flotante "Ver pedido · cantidad · total" y precios con separador de miles.
-- **Carrito**: cambiar cantidades con − / +, deslizar para eliminar
-  (`Dismissible`), vaciar con confirmación y estado vacío con acceso al
-  catálogo.
-- **Pago**: resumen del pedido, opciones de pago más claras y un "Procesando
-  pago..." simulado de 2 s (con chequeo de `mounted` después del `await`).
-- **Seguimiento**: número de pedido, línea de tiempo por etapas, resumen de
-  lo pagado y botón "Hacer otro pedido" al entregarse. Al volver atrás se
-  cae en el catálogo (`pushAndRemoveUntil`), no en un carrito vacío.
-- **Tests**: 9 tests (unitarios del carrito + flujo completo de pantallas).
+## Convenciones
 
-Todo sigue sin paquetes externos, con `ChangeNotifier` + `ListenableBuilder`
-y el patrón de callbacks, como se vio en clase.
+- **Idioma:** español para el dominio (`Producto`, `Pedido`,
+  `agregarProducto()`) e inglés solo para lo que viene de Flutter (`build`,
+  `Widget`, `notifyListeners`). Sin tildes ni ñ en los nombres.
+- **Nombres:** clases en `UpperCamelCase`, archivos en
+  `lowercase_with_underscores`, constantes en `lowerCamelCase`. Booleanos en
+  positivo (`estaVacio`, `puedePagar`).
+- **Piezas por sección:** `<Seccion>Screen` y widgets en
+  `ui/<seccion>/widgets/`, `<Seccion>ViewModel` en
+  `ui/<seccion>/view_models/`. Partes de una sola pantalla como clases
+  privadas en el mismo archivo (`_ResumenTotal`).
+- **Capas:** las vistas no hablan con la red; los ViewModels importan solo
+  `foundation.dart`; los servicios no guardan estado; los repositorios no
+  dependen entre sí. Las dependencias se reciben por el constructor.
+- **Verbos:** `cargar`, `agregar`, `quitar`, `eliminar`, `vaciar`, `armar`,
+  `pagar`, `seguir`. Consultas con sustantivo (`total`, `cantidadDe`).
+- **Async:** toda espera muestra carga, maneja el error con "Reintentar" y
+  tiene tiempo límite. Después de un `await`, chequear `mounted`.
+- **Textos de pantalla:** cortos, sin palabras técnicas, botones de al menos
+  56 dp con ícono y texto.
+- **Antes de cada commit:** `dart format .`, `flutter analyze` y `flutter test`.
 
 ## De la entrevista al código
 
 | Pedido de Don Ceferino | Dónde se resuelve |
 |---|---|
-| Ver el catálogo con precio del día | `models/producto.dart` + `HomeScreen` (`ListView` + `ProductoCard`) |
-| Armar el pedido y pagarlo (tarjeta o Mercado Pago) | `CarritoProvider`, `CarritoScreen`, `MetodoPagoScreen` |
-| Ver el reparto "como el GPS de un taxi", en todo momento | `SeguimientoScreen`, simulado por etapas con `Timer` (sin mapa real todavía — ver comentario "Punto de extensión" en el archivo) |
-| Aguantar 5.000 pedidos simultáneos en diciembre sin colgarse | **No es un problema de este frontend**: depende de la infraestructura del backend/servidor (ver nota abajo) |
-| "No quiero pagar servidores, que sea gratis" | Mismo punto: es una decisión de infraestructura, no de la app Flutter en sí |
-| Que se vea "moderna, con buena onda" | Material 3 (`useMaterial3: true`), `ColorScheme.fromSeed`, tarjetas redondeadas, `AnimatedSwitcher`, `TweenAnimationBuilder` en el seguimiento |
-
-## Nota para el informe (aclaración importante)
-
-Don Ceferino pidió que la app aguante 5.000 pedidos simultáneos en
-Nochebuena **sin costo de servidor**. Estos dos pedidos son incompatibles:
-soportar ese volumen de tráfico concurrente requiere infraestructura
-(servidores, base de datos, balanceo de carga), lo cual tiene un costo. Esta
-app Flutter es el **cliente** (frontend): la capacidad de aguantar picos de
-tráfico depende del backend que la sirva, que está fuera del alcance de esta
-materia — vale mencionarlo explícitamente en el informe entregable, como
-parte del relevamiento de requerimientos (para dejar asentado que el pedido,
-tal cual está planteado, no es técnicamente viable).
-
-## Qué NO incluye todavía (a propósito)
-
-Para mantenerse dentro de lo dictado hasta el momento en la materia, este
-proyecto **no** usa: paquetes de manejo de estado externos (`provider`,
-`riverpod`, `bloc`), geolocalización/mapas reales, ni integración real de
-pagos. Todo esto está mockeado o simulado, con comentarios en el código que
-marcan dónde se conectaría en una próxima entrega.
+| Ver el catálogo con precio del día | `ui/catalogo` + `CatalogoRepository` (backend o local) |
+| Pagar "con tarjeta o Mercado Pago" | `ui/pago` + `PagoRepository` + `backend/src/pagos.js` (Checkout Pro) |
+| Ver el reparto "como el GPS de un taxi" | `ui/seguimiento/widgets/mapa_repartidor.dart` + `backend/src/seguimiento.js` |
+| Cargar productos sin saber de tecnología | `ui/escaner` + `backend/src/ia.js` (foto → etiqueta) |
+| Que sea fácil para clientes mayores | `ui/inicio` (barra de 3 botones) + `ui/core/tema.dart` |
+| 5.000 pedidos simultáneos en diciembre, sin pagar servidores | **Incompatibles**: ver `INFORME_MEJORAS.md`, sección "Qué faltaría" |
