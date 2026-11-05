@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/data/repositories/seguimiento_repository.dart';
+import 'package:freshmarket_app/data/services/seguimiento_service.dart';
 import 'package:freshmarket_app/domain/models/estado_pedido.dart';
 import 'package:freshmarket_app/domain/models/metodo_pago.dart';
 import 'package:freshmarket_app/domain/models/posicion.dart';
@@ -35,6 +36,18 @@ void main() {
     viewModel.seguir(pedido);
 
     expect(service.ultimoDestino, {'lat': -32.9, 'lng': -68.85});
+  });
+
+  test('la demo nunca dice "0 min" mientras la bici está en camino', () async {
+    const simulado = SeguimientoServiceSimulado(
+      intervalo: Duration(milliseconds: 1),
+    );
+
+    final novedades = await simulado.seguirPedido('p').toList();
+    final enCamino = novedades.where((n) => n['estado'] == 'enCamino');
+
+    expect(enCamino, isNotEmpty);
+    expect(enCamino.every((n) => (n['minutosEstimados'] as int) >= 1), isTrue);
   });
 
   test('arranca en "recibido" y sin mapa', () {

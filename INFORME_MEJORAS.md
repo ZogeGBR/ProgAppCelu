@@ -37,7 +37,7 @@ García Badiola, Zoe — Lopez, Matias — Morichetti Ramal, Ignacio
 | Constantes con nombre (`altoBotonGrande`, `primerNumeroDePedido`, `_limiteAnalisis`) | Sin números mágicos | varios |
 | Lints extra: `prefer_single_quotes`, `unawaited_futures`, `use_build_context_synchronously` | Herramientas de código limpio | `analysis_options.yaml` |
 | Sección "Convenciones" del README actualizada | Consistencia del equipo | `README.md` |
-| 66 pruebas de la app (antes 9) | Pruebas con fakes, sin internet | `test/*` |
+| 67 pruebas de la app (antes 9) | Pruebas con fakes, sin internet | `test/*` |
 | El número de pedido lo asigna el servidor | Antes cada celular empezaba en #1001: dos clientes tenían el mismo número | `backend/src/pagos.js`, `pago_repository.dart` |
 | Un pedido ya existente no se puede pisar | Validación en el servidor: nunca confiar en lo que manda la app | `backend/src/pagos.js` |
 | Cambiar el catálogo y usar la IA exige la sesión del dueño | Antes cualquiera podía cargar productos o gastar la clave de Gemini | `backend/src/sesiones.js`, `app.js` |
@@ -48,12 +48,12 @@ García Badiola, Zoe — Lopez, Matias — Morichetti Ramal, Ignacio
 ### Mapa con el repartidor en bicicleta en tiempo real
 - Pantalla "Mi pedido": cuando el pedido está **en camino**, aparece un mapa
   de **OpenStreetMap** (`flutter_map`, gratis y sin clave) con la bici y la
-  casa. El mapa se centra solo en cada posición nueva y muestra los minutos
-  que faltan.
+  casa. El mapa se acomoda en cada posición nueva para mostrar las dos cosas
+  juntas, con los minutos que faltan.
 - La posición llega por `SeguimientoService`: en la demo se simula un recorrido
   por el centro de Mendoza; con backend se consulta `/pedidos/:id/seguimiento`
   cada 3 s. El celular del repartidor manda su GPS a `/repartidores/posicion`
-  (con clave compartida).
+  (con su sesión).
 
 ### Cargar producto con una foto (IA)
 - En "Mi almacén" (solo para el dueño), un botón grande: **Cargar producto
@@ -135,7 +135,7 @@ Vista (Screen) ──comandos──▶ ViewModel (ChangeNotifier, solo foundatio
 | App: `CarritoViewModel` | 8 | Pasan |
 | App: `CatalogoViewModel` (caché, reintento, error, filtros) | 6 | Pasan |
 | App: `PagoViewModel` (aprobado, rechazado, error, sin confirmar, dirección, efectivo, número del servidor) | 10 | Pasan |
-| App: `SeguimientoViewModel` (mapa, corte de señal, entregado, destino) | 5 | Pasan |
+| App: `SeguimientoViewModel` (mapa, corte de señal, entregado, destino, minutos) | 6 | Pasan |
 | App: `EscanerViewModel` (foto, edición, guardar, IA falla) | 5 | Pasan |
 | App: `AlmacenViewModel` (precio, sin stock, borrar, error) | 6 | Pasan |
 | App: `RepartoViewModel` (permisos, GPS, corte de señal, entrega) | 8 | Pasan |
@@ -181,11 +181,11 @@ de carga. Falta repetirlo en el servidor real.
 | Cuentas individuales para los repartidores | Hoy todos comparten una clave, así que no se sabe quién lleva cada pedido | Media |
 | Volver solo a la app después de pagar (deep link) | Hoy vuelve con una página web y la app detecta el pago consultando | Media |
 | Notificaciones push ("tu pedido está en camino") | Avisar sin tener la app abierta (Firebase Cloud Messaging) | Media |
-| Cantidad de stock | Hoy es "hay / no hay": alcanza para el almacén, pero no descuenta unidades | Baja |
 | Guardar la foto del producto y mostrarla en el catálogo | Hoy el catálogo usa emojis | Media |
 | Proveedor de mapas para producción | Los mosaicos públicos de OpenStreetMap tienen límite de uso justo; con muchos usuarios conviene MapTiler, Stadia o un caché propio | Media |
 | Pruebas de usabilidad con clientes reales del almacén | Confirmar que personas mayores completan una compra sin ayuda | Media |
-| Credenciales de producción de Mercado Pago y devoluciones | Hoy se prueba con credenciales de prueba; falta el flujo de reembolso | Media |
+| Credenciales de producción de Mercado Pago y devoluciones | El pago real todavía no se probó, ni siquiera con credenciales de prueba; también falta el flujo de reembolso | Media |
+| Cantidad de stock | Hoy es "hay / no hay": alcanza para el almacén, pero no descuenta unidades | Baja |
 | Costos | Mercado Pago cobra comisión por venta; Gemini tiene un nivel gratis con límites; el hosting tiene costo mensual | Baja |
 | Accesibilidad avanzada | Etiquetas `Semantics` para lector de pantalla y prueba con letra al 200 % | Baja |
 | Publicar en Play Store | Firma, íconos y política de privacidad (usa la cámara) | Baja |

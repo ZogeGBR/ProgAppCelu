@@ -66,7 +66,7 @@ Hace falta **Node 22.13 o más nuevo**, que ya trae SQLite.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 66 pruebas (ViewModels con fakes y pantallas)
+flutter test           # app: 67 pruebas (ViewModels con fakes y pantallas)
 cd backend && npm test # backend: 27 pruebas
 node scripts/carga.mjs 500   # (desde backend/) prueba de carga
 ```
