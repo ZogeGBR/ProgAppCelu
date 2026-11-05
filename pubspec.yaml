@@ -10,6 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
+  # Llamadas al backend propio (catálogo, pagos, seguimiento, IA).
+  http: ^1.2.2
+  # Mapa de OpenStreetMap: gratis y sin clave.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  # Abre el checkout de Mercado Pago (app o navegador).
+  url_launcher: ^6.3.1
+  # Cámara y galería para cargar productos con una foto.
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
