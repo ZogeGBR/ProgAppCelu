@@ -1,0 +1,20 @@
+{
+  "name": "freshmarket-backend",
+  "version": "1.0.0",
+  "description": "Backend de FreshMarket: catálogo, pagos con Mercado Pago, seguimiento del reparto e IA para etiquetar productos.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "express": "^4.22.3",
+    "mercadopago": "^2.13.0"
+  }
+}
