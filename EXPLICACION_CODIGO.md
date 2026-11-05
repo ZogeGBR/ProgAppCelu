@@ -2,6 +2,25 @@
 
 Guía archivo por archivo del proyecto. Explica qué hace cada archivo, cómo se conectan entre sí y por qué está hecho así. Está pensada para entender el código de punta a punta y poder defenderlo en una presentación.
 
+> **Aviso — Versión 3.** Esta guía explica archivo por archivo la
+> **versión 2** (carpetas `models/`, `providers/`, `screens/`, `widgets/`,
+> `utils/`). En la V3 el proyecto se reorganizó en capas. Los conceptos
+> siguen valiendo; lo que cambió de lugar es esto:
+>
+> | V2 | V3 |
+> |---|---|
+> | `models/*.dart` | `domain/models/*.dart` (sin `IconData`: los íconos y textos pasaron a `ui/.../*_ui.dart`) |
+> | `providers/carrito_provider.dart` | `ui/carrito/view_models/carrito_view_model.dart` (`confirmarPedido` se separó en `armarPedido` + `vaciarCarrito`) |
+> | `screens/home_screen.dart` | `ui/catalogo/widgets/catalogo_screen.dart` + `CatalogoViewModel` |
+> | `screens/carrito_screen.dart` | `ui/carrito/widgets/carrito_screen.dart` |
+> | `screens/metodo_pago_screen.dart` | `ui/pago/widgets/pago_screen.dart` + `PagoViewModel` (Mercado Pago real) |
+> | `screens/seguimiento_screen.dart` | `ui/seguimiento/` (+ mapa en tiempo real) |
+> | `widgets/*.dart` | `ui/catalogo/widgets/` |
+> | `utils/formato.dart` | `ui/core/formato.dart` |
+> | — | `data/services/`, `data/repositories/`, `config/dependencias.dart`, `ui/escaner/`, `backend/` (nuevos) |
+>
+> Qué se mejoró y por qué: [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
+
 ---
 
 ## Índice
