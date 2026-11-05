@@ -8,6 +8,7 @@ extension MetodoPagoUi on MetodoPago {
         MetodoPago.debito => 'Tarjeta de débito',
         MetodoPago.credito => 'Tarjeta de crédito',
         MetodoPago.billeteraMercadoPago => 'Dinero en Mercado Pago',
+        MetodoPago.efectivo => 'Efectivo al recibir',
       };
 
   String get ayuda => switch (this) {
@@ -15,11 +16,13 @@ extension MetodoPagoUi on MetodoPago {
         MetodoPago.credito => 'Se paga en tu próximo resumen.',
         MetodoPago.billeteraMercadoPago =>
           'Usás la plata que tenés en la app de Mercado Pago.',
+        MetodoPago.efectivo => 'Le pagás al repartidor cuando llega.',
       };
 
   IconData get icono => switch (this) {
         MetodoPago.debito => Icons.credit_card,
         MetodoPago.credito => Icons.credit_score,
         MetodoPago.billeteraMercadoPago => Icons.account_balance_wallet,
+        MetodoPago.efectivo => Icons.payments_outlined,
       };
 }

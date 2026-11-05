@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/data/repositories/pago_repository.dart';
 import 'package:freshmarket_app/domain/models/metodo_pago.dart';
 import 'package:freshmarket_app/domain/models/pedido.dart';
+import 'package:freshmarket_app/domain/models/posicion.dart';
 import 'package:freshmarket_app/ui/carrito/view_models/carrito_view_model.dart';
 import 'package:freshmarket_app/ui/pago/view_models/pago_view_model.dart';
 
@@ -20,9 +21,11 @@ void main() {
     List<String> respuestas = const ['aprobado'],
     bool seAbre = true,
     Duration limite = const Duration(seconds: 5),
+    int? numero,
+    bool conDireccion = true,
   }) {
     carrito = CarritoViewModel()..agregarProducto(yerba);
-    service = PagoServiceFalso(respuestas: respuestas);
+    service = PagoServiceFalso(respuestas: respuestas, numero: numero);
     checkout = CheckoutFalso(seAbre: seAbre);
     aprobado = null;
     viewModel = PagoViewModel(
@@ -35,6 +38,7 @@ void main() {
       armarPedido: carrito.armarPedido,
       alAprobar: (pedido) => aprobado = pedido,
     );
+    if (conDireccion) viewModel.cambiarDireccion('San Martín 1234');
   }
 
   /// Espera a que el ViewModel deje de estar ocupado.
@@ -53,6 +57,57 @@ void main() {
     await viewModel.pagar();
 
     expect(service.pedidosEnviados, isEmpty);
+  });
+
+  test('no se puede pagar sin escribir la dirección', () async {
+    crear(conDireccion: false);
+    viewModel
+      ..elegirMetodo(MetodoPago.debito)
+      ..cambiarDireccion('   ');
+    expect(viewModel.puedePagar, isFalse);
+
+    await viewModel.pagar();
+
+    expect(service.pedidosEnviados, isEmpty);
+  });
+
+  test('el pedido viaja con la dirección y el punto del mapa', () async {
+    crear();
+    const casa = Posicion(latitud: -32.9, longitud: -68.85);
+    viewModel
+      ..elegirMetodo(MetodoPago.debito)
+      ..cambiarDireccion('  Belgrano 55 ')
+      ..marcarDestino(casa);
+
+    await viewModel.pagar();
+    await esperarResultado();
+
+    final enviado = service.pedidosEnviados.single;
+    expect(enviado['direccion'], 'Belgrano 55');
+    expect(enviado['destino'], {'lat': -32.9, 'lng': -68.85});
+    expect(aprobado?.destino, casa);
+  });
+
+  test('el número de pedido lo asigna el servidor', () async {
+    crear(numero: 2057);
+    viewModel.elegirMetodo(MetodoPago.debito);
+
+    await viewModel.pagar();
+    await esperarResultado();
+
+    expect(aprobado?.numero, 2057);
+  });
+
+  test('en efectivo se confirma sin abrir Mercado Pago', () async {
+    crear(respuestas: ['pendiente']);
+    viewModel.elegirMetodo(MetodoPago.efectivo);
+
+    await viewModel.pagar();
+
+    expect(viewModel.paso, PasoPago.aprobado);
+    expect(checkout.abiertos, isEmpty);
+    expect(aprobado?.metodoPago, MetodoPago.efectivo);
+    expect(service.pedidosEnviados.single['metodoPago'], 'efectivo');
   });
 
   test('pago aprobado: abre Mercado Pago y avisa con el pedido', () async {

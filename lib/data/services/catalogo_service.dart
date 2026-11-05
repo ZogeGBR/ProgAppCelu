@@ -6,6 +6,14 @@ abstract interface class CatalogoService {
   Future<List<Map<String, dynamic>>> obtenerProductos();
 
   Future<Map<String, dynamic>> guardarProducto(Map<String, dynamic> datos);
+
+  /// Cambia solo los datos que vengan en [cambios].
+  Future<Map<String, dynamic>> actualizarProducto(
+    String id,
+    Map<String, dynamic> cambios,
+  );
+
+  Future<void> eliminarProducto(String id);
 }
 
 /// Catálogo servido por el backend de FreshMarket (`/productos`).
@@ -25,6 +33,19 @@ class CatalogoServiceHttp implements CatalogoService {
     Map<String, dynamic> datos,
   ) async {
     return await _api.post('/productos', datos) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> actualizarProducto(
+    String id,
+    Map<String, dynamic> cambios,
+  ) async {
+    return await _api.put('/productos/$id', cambios) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<void> eliminarProducto(String id) async {
+    await _api.delete('/productos/$id');
   }
 }
 
@@ -110,5 +131,23 @@ class CatalogoServiceLocal implements CatalogoService {
     final nuevo = {...datos, 'id': 'p${_productos.length + 1}'};
     _productos.add(nuevo);
     return nuevo;
+  }
+
+  @override
+  Future<Map<String, dynamic>> actualizarProducto(
+    String id,
+    Map<String, dynamic> cambios,
+  ) async {
+    await Future<void>.delayed(demora);
+    final indice = _productos.indexWhere((producto) => producto['id'] == id);
+    final actualizado = {..._productos[indice], ...cambios};
+    _productos[indice] = actualizado;
+    return actualizado;
+  }
+
+  @override
+  Future<void> eliminarProducto(String id) async {
+    await Future<void>.delayed(demora);
+    _productos.removeWhere((producto) => producto['id'] == id);
   }
 }

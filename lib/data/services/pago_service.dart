@@ -8,7 +8,8 @@ import 'api_client.dart';
 /// la preferencia de pago (y recalcula el total con sus propios precios)
 /// y la app solo abre el link de pago que recibe.
 abstract interface class PagoService {
-  /// Devuelve `{'preferenciaId': ..., 'urlCheckout': ...}`.
+  /// Devuelve `{'preferenciaId': ..., 'urlCheckout': ..., 'numero': ...}`.
+  /// En efectivo no hay nada que abrir: `urlCheckout` viene en null.
   Future<Map<String, dynamic>> crearPreferencia(Map<String, dynamic> pedido);
 
   /// Devuelve `{'estado': 'aprobado' | 'pendiente' | 'rechazado'}`.
@@ -63,9 +64,10 @@ class PagoServiceSimulado implements PagoService {
     Map<String, dynamic> pedido,
   ) async {
     await Future<void>.delayed(demora);
+    final esEfectivo = pedido['metodoPago'] == 'efectivo';
     return {
       'preferenciaId': 'simulada-${pedido['id']}',
-      'urlCheckout': 'https://www.mercadopago.com.ar/',
+      'urlCheckout': esEfectivo ? null : 'https://www.mercadopago.com.ar/',
     };
   }
 

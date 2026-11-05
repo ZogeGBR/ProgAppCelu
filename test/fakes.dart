@@ -9,8 +9,13 @@ import 'dart:typed_data';
 import 'package:freshmarket_app/data/services/camara_service.dart';
 import 'package:freshmarket_app/data/services/catalogo_service.dart';
 import 'package:freshmarket_app/data/services/etiquetado_service.dart';
+import 'package:freshmarket_app/data/services/api_client.dart';
 import 'package:freshmarket_app/data/services/pago_service.dart';
+import 'package:freshmarket_app/data/services/reparto_service.dart';
 import 'package:freshmarket_app/data/services/seguimiento_service.dart';
+import 'package:freshmarket_app/data/services/sesion_service.dart';
+import 'package:freshmarket_app/data/services/ubicacion_service.dart';
+import 'package:freshmarket_app/domain/models/posicion.dart';
 import 'package:freshmarket_app/domain/models/producto.dart';
 
 const yerba = Producto(
@@ -58,6 +63,93 @@ class CatalogoServiceFalso implements CatalogoService {
     guardados.add(nuevo);
     return nuevo;
   }
+
+  bool fallaAlGuardar = false;
+
+  @override
+  Future<Map<String, dynamic>> actualizarProducto(
+    String id,
+    Map<String, dynamic> cambios,
+  ) async {
+    if (fallaAlGuardar) throw Exception('sin conexión');
+    final indice = productos.indexWhere((producto) => producto['id'] == id);
+    productos[indice] = {...productos[indice], ...cambios};
+    return productos[indice];
+  }
+
+  @override
+  Future<void> eliminarProducto(String id) async {
+    if (fallaAlGuardar) throw Exception('sin conexión');
+    productos.removeWhere((producto) => producto['id'] == id);
+  }
+}
+
+class SesionServiceFalso implements SesionService {
+  bool sinConexion = false;
+
+  @override
+  Future<Map<String, dynamic>> ingresar(String clave) async {
+    if (sinConexion) throw Exception('sin conexión');
+    return switch (clave) {
+      'clave-dueno' => {'rol': 'dueno', 'token': 'token-dueno'},
+      'clave-reparto' => {'rol': 'repartidor', 'token': 'token-reparto'},
+      _ => throw const ApiException(401, 'Clave incorrecta.'),
+    };
+  }
+}
+
+class RepartoServiceFalso implements RepartoService {
+  bool falla = false;
+  final posiciones = <Map<String, dynamic>>[];
+  final entregados = <String>[];
+  final pedidos = <Map<String, dynamic>>[
+    {
+      'id': 'r-1',
+      'numero': 1005,
+      'direccion': 'Belgrano 55',
+      'destino': {'lat': -32.88, 'lng': -68.83},
+      'total': 5300,
+      'metodoPago': 'efectivo',
+      'productos': ['1 × Yerba mate 1kg'],
+    },
+  ];
+
+  @override
+  Future<List<Map<String, dynamic>>> obtenerPedidos() async {
+    if (falla) throw Exception('sin conexión');
+    return List.of(pedidos);
+  }
+
+  @override
+  Future<void> enviarPosicion(Map<String, dynamic> posicion) async {
+    if (falla) throw Exception('sin señal');
+    posiciones.add(posicion);
+  }
+
+  @override
+  Future<void> marcarEntregado(String pedidoId) async {
+    if (falla) throw Exception('sin señal');
+    entregados.add(pedidoId);
+    pedidos.removeWhere((pedido) => pedido['id'] == pedidoId);
+  }
+}
+
+/// Las pruebas deciden el permiso y cuándo se mueve el repartidor.
+class UbicacionFalsa implements UbicacionService {
+  UbicacionFalsa({this.permiso = PermisoUbicacion.concedido});
+
+  PermisoUbicacion permiso;
+  final _controlador = StreamController<Posicion>.broadcast();
+
+  void mover(Posicion posicion) => _controlador.add(posicion);
+
+  bool get hayQuienEscuche => _controlador.hasListener;
+
+  @override
+  Future<PermisoUbicacion> pedirPermiso() async => permiso;
+
+  @override
+  Stream<Posicion> seguir() => _controlador.stream;
 }
 
 /// Las pruebas deciden cuándo llega cada novedad del reparto.
@@ -69,8 +161,15 @@ class SeguimientoServiceFalso implements SeguimientoService {
   void fallar() => _controlador.addError(Exception('sin señal'));
 
   @override
-  Stream<Map<String, dynamic>> seguirPedido(String pedidoId) =>
-      _controlador.stream;
+  Stream<Map<String, dynamic>> seguirPedido(
+    String pedidoId, {
+    Map<String, dynamic>? destino,
+  }) {
+    ultimoDestino = destino;
+    return _controlador.stream;
+  }
+
+  Map<String, dynamic>? ultimoDestino;
 }
 
 class CamaraFalsa implements CamaraService {
@@ -99,7 +198,10 @@ class EtiquetadoServiceFalso implements EtiquetadoService {
 
 /// Devuelve los estados de [respuestas] en orden (el último se repite).
 class PagoServiceFalso implements PagoService {
-  PagoServiceFalso({this.respuestas = const ['aprobado']});
+  PagoServiceFalso({this.respuestas = const ['aprobado'], this.numero});
+
+  /// El número que asignaría el servidor.
+  final int? numero;
 
   final List<String> respuestas;
   bool fallaAlCrear = false;
@@ -112,7 +214,12 @@ class PagoServiceFalso implements PagoService {
   ) async {
     if (fallaAlCrear) throw Exception('backend caído');
     pedidosEnviados.add(pedido);
-    return {'preferenciaId': 'pref-1', 'urlCheckout': 'https://mp.test/pagar'};
+    return {
+      'preferenciaId': 'pref-1',
+      'urlCheckout':
+          pedido['metodoPago'] == 'efectivo' ? null : 'https://mp.test/pagar',
+      'numero': numero,
+    };
   }
 
   @override

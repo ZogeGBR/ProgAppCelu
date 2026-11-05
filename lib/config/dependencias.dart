@@ -1,13 +1,18 @@
 import '../data/repositories/catalogo_repository.dart';
 import '../data/repositories/etiquetado_repository.dart';
 import '../data/repositories/pago_repository.dart';
+import '../data/repositories/reparto_repository.dart';
 import '../data/repositories/seguimiento_repository.dart';
+import '../data/repositories/sesion_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/camara_service.dart';
 import '../data/services/catalogo_service.dart';
 import '../data/services/etiquetado_service.dart';
 import '../data/services/pago_service.dart';
+import '../data/services/reparto_service.dart';
 import '../data/services/seguimiento_service.dart';
+import '../data/services/sesion_service.dart';
+import '../data/services/ubicacion_service.dart';
 
 /// Configuración que llega al compilar con `--dart-define`.
 ///
@@ -20,8 +25,6 @@ import '../data/services/seguimiento_service.dart';
 /// solo en el backend.
 abstract final class AppConfig {
   static const urlBackend = String.fromEnvironment('URL_BACKEND');
-  static const mostrarModoDueno =
-      bool.fromEnvironment('MODO_DUENO', defaultValue: true);
 
   static bool get usaBackend => urlBackend.isNotEmpty;
 }
@@ -36,7 +39,9 @@ class Dependencias {
     required this.seguimiento,
     required this.etiquetado,
     required this.pago,
-    this.mostrarModoDueno = true,
+    required this.sesion,
+    required this.reparto,
+    this.pistaClaves,
   });
 
   factory Dependencias.desdeConfiguracion() {
@@ -55,7 +60,14 @@ class Dependencias {
         service: PagoServiceHttp(api),
         checkout: const CheckoutLauncherExterno(),
       ),
-      mostrarModoDueno: AppConfig.mostrarModoDueno,
+      sesion: SesionRepository(
+        service: SesionServiceHttp(api),
+        alCambiarToken: (token) => api.token = token,
+      ),
+      reparto: RepartoRepository(
+        service: RepartoServiceHttp(api),
+        ubicacion: const UbicacionServiceGeolocator(),
+      ),
     );
   }
 
@@ -67,6 +79,9 @@ class Dependencias {
     CamaraService? camara,
     EtiquetadoService? etiquetadoService,
     PagoService? pagoService,
+    SesionService? sesionService,
+    RepartoService? repartoService,
+    UbicacionService? ubicacionService,
     Duration intervaloPago = const Duration(seconds: 1),
   }) {
     return Dependencias(
@@ -85,7 +100,15 @@ class Dependencias {
         checkout: const CheckoutLauncherSimulado(),
         intervaloConsulta: intervaloPago,
       ),
-      mostrarModoDueno: AppConfig.mostrarModoDueno,
+      sesion: SesionRepository(
+        service: sesionService ?? const SesionServiceSimulado(),
+      ),
+      reparto: RepartoRepository(
+        service: repartoService ?? RepartoServiceSimulado(),
+        ubicacion: ubicacionService ?? const UbicacionServiceGeolocator(),
+      ),
+      pistaClaves: 'Demo: la clave es "${SesionServiceSimulado.claveDueno}" '
+          'o "${SesionServiceSimulado.claveRepartidor}".',
     );
   }
 
@@ -93,5 +116,9 @@ class Dependencias {
   final SeguimientoRepository seguimiento;
   final EtiquetadoRepository etiquetado;
   final PagoRepository pago;
-  final bool mostrarModoDueno;
+  final SesionRepository sesion;
+  final RepartoRepository reparto;
+
+  /// Solo en la demo: qué claves se pueden usar para ingresar.
+  final String? pistaClaves;
 }

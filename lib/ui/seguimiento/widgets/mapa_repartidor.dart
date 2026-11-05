@@ -8,7 +8,8 @@ import '../../../domain/models/posicion.dart';
 ///
 /// Usa OpenStreetMap con flutter_map: es gratis y no necesita clave,
 /// algo importante porque Don Ceferino no quiere pagar servicios.
-/// Cada vez que llega una posición nueva, el mapa se centra en la bici.
+/// Cada vez que llega una posición nueva, el mapa se acomoda para que se
+/// vean la bici y la casa juntas.
 class MapaRepartidor extends StatefulWidget {
   const MapaRepartidor({
     super.key,
@@ -26,18 +27,33 @@ class MapaRepartidor extends StatefulWidget {
 class _MapaRepartidorState extends State<MapaRepartidor> {
   static const _zoomInicial = 15.0;
   static const _tamanoMarcador = 52.0;
+  static const _zoomMaximo = 17.0;
+  static const _margen = EdgeInsets.all(56);
 
   final _controlador = MapController();
 
   @override
   void didUpdateWidget(MapaRepartidor anterior) {
     super.didUpdateWidget(anterior);
-    if (anterior.repartidor != widget.repartidor) {
-      _controlador.move(
-        _aLatLng(widget.repartidor),
-        _controlador.camera.zoom,
-      );
+    if (anterior.repartidor == widget.repartidor) return;
+
+    final encuadre = _encuadre;
+    if (encuadre != null) {
+      _controlador.fitCamera(encuadre);
+    } else {
+      _controlador.move(_aLatLng(widget.repartidor), _controlador.camera.zoom);
     }
+  }
+
+  /// Muestra la bici y la casa. Null si todavía no se sabe dónde es la casa.
+  CameraFit? get _encuadre {
+    final destino = widget.destino;
+    if (destino == null) return null;
+    return CameraFit.coordinates(
+      coordinates: [_aLatLng(widget.repartidor), _aLatLng(destino)],
+      padding: _margen,
+      maxZoom: _zoomMaximo,
+    );
   }
 
   @override
@@ -56,6 +72,7 @@ class _MapaRepartidorState extends State<MapaRepartidor> {
       options: MapOptions(
         initialCenter: _aLatLng(widget.repartidor),
         initialZoom: _zoomInicial,
+        initialCameraFit: _encuadre,
       ),
       children: [
         TileLayer(

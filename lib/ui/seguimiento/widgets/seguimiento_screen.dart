@@ -89,9 +89,14 @@ class SeguimientoScreen extends StatelessWidget {
                         valor: '${pedido.cantidadProductos}',
                       ),
                       _FilaResumen(
-                        etiqueta: 'Pagado con',
+                        etiqueta: 'Forma de pago',
                         valor: pedido.metodoPago.nombre,
                       ),
+                      if (pedido.direccion.isNotEmpty)
+                        _FilaResumen(
+                          etiqueta: 'Entrega en',
+                          valor: pedido.direccion,
+                        ),
                       _FilaResumen(
                         etiqueta: 'Total',
                         valor: formatearPrecio(pedido.total),

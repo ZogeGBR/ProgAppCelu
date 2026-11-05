@@ -22,12 +22,19 @@ class PagoRepository {
   final Duration intervaloConsulta;
   final Duration limiteEspera;
 
-  /// Crea la preferencia y abre Mercado Pago.
-  Future<void> iniciarPago(Pedido pedido) async {
+  /// Registra el pedido y, salvo en efectivo, abre Mercado Pago.
+  ///
+  /// Devuelve el pedido con el número que asignó el servidor: si lo eligiera
+  /// cada celular, dos clientes tendrían el mismo. Sin backend (demo) queda
+  /// el número local.
+  Future<Pedido> iniciarPago(Pedido pedido) async {
     final preferencia = await _service.crearPreferencia(pedido.toJson());
-    final url = Uri.parse(preferencia['urlCheckout'] as String);
-    final seAbrio = await _checkout.abrir(url);
-    if (!seAbrio) throw const PagoException('No se pudo abrir Mercado Pago.');
+    final url = preferencia['urlCheckout'] as String?;
+    if (url != null) {
+      final seAbrio = await _checkout.abrir(Uri.parse(url));
+      if (!seAbrio) throw const PagoException('No se pudo abrir Mercado Pago.');
+    }
+    return pedido.copiarCon(numero: preferencia['numero'] as int?);
   }
 
   /// Emite el estado del pago en cada consulta. Termina solo al pasar

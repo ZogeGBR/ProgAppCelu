@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// Las secciones de la barra de abajo, en orden.
-enum Seccion { comprar, carrito, miPedido, cargarProducto }
+enum Seccion { comprar, carrito, miPedido, almacen, repartir }
 
 /// Qué sección de la barra inferior está abierta.
 class NavegacionViewModel extends ChangeNotifier {

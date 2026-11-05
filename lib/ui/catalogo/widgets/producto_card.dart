@@ -73,7 +73,12 @@ class ProductoCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // El botón ocupa todo el ancho: es el blanco más fácil de tocar.
-            if (cantidadEnCarrito == 0)
+            if (!producto.disponible && cantidadEnCarrito == 0)
+              const FilledButton.tonal(
+                onPressed: null,
+                child: Text('Hoy no hay'),
+              )
+            else if (cantidadEnCarrito == 0)
               FilledButton.tonalIcon(
                 onPressed: onAgregar,
                 icon: const Icon(Icons.add_shopping_cart),

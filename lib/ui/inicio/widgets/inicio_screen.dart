@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../data/repositories/pago_repository.dart';
+import '../../almacen/view_models/almacen_view_model.dart';
+import '../../almacen/widgets/almacen_screen.dart';
 import '../../carrito/view_models/carrito_view_model.dart';
 import '../../carrito/widgets/carrito_screen.dart';
 import '../../catalogo/view_models/catalogo_view_model.dart';
@@ -9,15 +13,20 @@ import '../../escaner/view_models/escaner_view_model.dart';
 import '../../escaner/widgets/escaner_screen.dart';
 import '../../pago/view_models/pago_view_model.dart';
 import '../../pago/widgets/pago_screen.dart';
+import '../../reparto/view_models/reparto_view_model.dart';
+import '../../reparto/widgets/reparto_screen.dart';
 import '../../seguimiento/view_models/seguimiento_view_model.dart';
 import '../../seguimiento/widgets/seguimiento_screen.dart';
+import '../../sesion/view_models/sesion_view_model.dart';
+import '../../sesion/widgets/ingresar_screen.dart';
 import '../view_models/navegacion_view_model.dart';
 
 /// Pantalla principal con la barra de abajo.
 ///
 /// Toda la app se maneja con 3 botones grandes siempre visibles
-/// (Comprar, Mi carrito, Mi pedido), más "Cargar producto" para el
-/// dueño. No hay menús escondidos: cada cosa está a un toque.
+/// (Comprar, Mi carrito, Mi pedido), más "Mi almacén" para el dueño o
+/// "Repartir" para el repartidor, una vez que ingresan con su clave.
+/// No hay menús escondidos: cada cosa está a un toque.
 class InicioScreen extends StatelessWidget {
   const InicioScreen({
     super.key,
@@ -26,8 +35,11 @@ class InicioScreen extends StatelessWidget {
     required this.carrito,
     required this.seguimiento,
     required this.escaner,
+    required this.sesion,
+    required this.almacen,
+    required this.reparto,
     required this.pagoRepositorio,
-    required this.mostrarModoDueno,
+    this.pistaClaves,
   });
 
   final NavegacionViewModel navegacion;
@@ -35,15 +47,51 @@ class InicioScreen extends StatelessWidget {
   final CarritoViewModel carrito;
   final SeguimientoViewModel seguimiento;
   final EscanerViewModel escaner;
+  final SesionViewModel sesion;
+  final AlmacenViewModel almacen;
+  final RepartoViewModel reparto;
   final PagoRepository pagoRepositorio;
-  final bool mostrarModoDueno;
+  final String? pistaClaves;
 
   List<Seccion> get _secciones => [
         Seccion.comprar,
         Seccion.carrito,
         Seccion.miPedido,
-        if (mostrarModoDueno) Seccion.cargarProducto,
+        if (sesion.esDueno) Seccion.almacen,
+        if (sesion.esRepartidor) Seccion.repartir,
       ];
+
+  void _abrirIngreso(BuildContext context) {
+    final pantalla = IngresarScreen(
+      viewModel: sesion,
+      pista: pistaClaves,
+      alIngresar: _alIngresar,
+    );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
+  }
+
+  void _alIngresar() {
+    if (sesion.esDueno) {
+      unawaited(almacen.cargar(forzar: true));
+      navegacion.irA(Seccion.almacen);
+    } else {
+      unawaited(reparto.cargar());
+      navegacion.irA(Seccion.repartir);
+    }
+  }
+
+  void _salir() {
+    reparto.detener();
+    sesion.salir();
+    navegacion.irA(Seccion.comprar);
+  }
+
+  void _abrirCargaConFoto(BuildContext context) {
+    final pantalla = EscanerScreen(viewModel: escaner);
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
+  }
 
   void _abrirPago(BuildContext context) {
     final pantalla = PagoScreen(
@@ -65,11 +113,11 @@ class InicioScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secciones = _secciones;
-
     return ListenableBuilder(
-      listenable: Listenable.merge([navegacion, carrito, seguimiento]),
+      listenable: Listenable.merge([navegacion, carrito, seguimiento, sesion]),
       builder: (context, _) {
+        // Cambian según quién haya ingresado.
+        final secciones = _secciones;
         final indice = secciones.indexOf(navegacion.actual);
 
         return Scaffold(
@@ -99,6 +147,7 @@ class InicioScreen extends StatelessWidget {
           viewModel: catalogo,
           carrito: carrito,
           alVerCarrito: () => navegacion.irA(Seccion.carrito),
+          alIngresar: sesion.haySesion ? null : () => _abrirIngreso(context),
         ),
       Seccion.carrito => CarritoScreen(
           carrito: carrito,
@@ -109,7 +158,12 @@ class InicioScreen extends StatelessWidget {
           viewModel: seguimiento,
           alIrAComprar: () => navegacion.irA(Seccion.comprar),
         ),
-      Seccion.cargarProducto => EscanerScreen(viewModel: escaner),
+      Seccion.almacen => AlmacenScreen(
+          viewModel: almacen,
+          alCargarConFoto: () => _abrirCargaConFoto(context),
+          alSalir: _salir,
+        ),
+      Seccion.repartir => RepartoScreen(viewModel: reparto, alSalir: _salir),
     };
   }
 
@@ -140,10 +194,15 @@ class InicioScreen extends StatelessWidget {
           ),
           label: 'Mi pedido',
         ),
-      Seccion.cargarProducto => const NavigationDestination(
-          icon: Icon(Icons.add_a_photo_outlined, size: 30),
-          selectedIcon: Icon(Icons.add_a_photo, size: 30),
-          label: 'Cargar',
+      Seccion.almacen => const NavigationDestination(
+          icon: Icon(Icons.inventory_2_outlined, size: 30),
+          selectedIcon: Icon(Icons.inventory_2, size: 30),
+          label: 'Mi almacén',
+        ),
+      Seccion.repartir => const NavigationDestination(
+          icon: Icon(Icons.delivery_dining_outlined, size: 30),
+          selectedIcon: Icon(Icons.delivery_dining, size: 30),
+          label: 'Repartir',
         ),
     };
   }

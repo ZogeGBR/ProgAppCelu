@@ -2,6 +2,9 @@
     <!-- Backend, mapa y Mercado Pago necesitan internet (en debug ya
          viene, pero sin esto la versión release no se conecta). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Modo repartidor: mandar la ubicación para que el cliente lo vea. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <application
         android:label="FreshMarket"
         android:name="${applicationName}"
