@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Backend, mapa y Mercado Pago necesitan internet (en debug ya
+         viene, pero sin esto la versión release no se conecta). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="FreshMarket"
         android:name="${applicationName}"
@@ -40,6 +43,12 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher: permite abrir el checkout de Mercado Pago en la
+             app de Mercado Pago o en el navegador (Android 11+). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

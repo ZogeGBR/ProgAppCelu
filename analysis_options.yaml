@@ -21,8 +21,13 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # Reglas extra que vimos en la materia (además de flutter_lints):
+    prefer_single_quotes: true
+    # Un Future sin await no atrapa sus errores en el try/catch.
+    unawaited_futures: true
+    # Después de un await la pantalla puede no existir más.
+    use_build_context_synchronously: true
+    prefer_const_constructors: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

@@ -1,44 +1,48 @@
 // Pruebas de caracterización (paso 0 del plan de refactoring).
 //
-// Fijan el comportamiento OBSERVABLE de la versión V2 antes de
-// reorganizar el proyecto en capas. Solo miran lo que se ve desde
-// afuera (totales, formato, numeración de pedidos), nunca detalles
-// internos, para no frenar el refactoring.
+// Se escribieron contra la V2, ANTES de reorganizar el proyecto en
+// capas, y siguen fijando el mismo comportamiento observable: numeración
+// de pedidos, totales, copia de los ítems y formato de precios.
+//
+// Único cambio a propósito: antes confirmarPedido() armaba el pedido y
+// vaciaba el carrito en un solo paso. Ahora son dos (armarPedido y
+// vaciarCarrito), porque el carrito se vacía recién cuando Mercado Pago
+// aprueba el pago. Las expectativas son las mismas.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:freshmarket_app/domain/models/metodo_pago.dart';
+import 'package:freshmarket_app/ui/carrito/view_models/carrito_view_model.dart';
+import 'package:freshmarket_app/ui/core/formato.dart';
 
-import 'package:freshmarket_app/models/metodo_pago.dart';
-import 'package:freshmarket_app/models/producto.dart';
-import 'package:freshmarket_app/providers/carrito_provider.dart';
-import 'package:freshmarket_app/utils/formato.dart';
+import 'fakes.dart';
 
 void main() {
-  final fideos = catalogoFreshMarket.firstWhere((p) => p.id == 'p1'); // 1200
-  final queso = catalogoFreshMarket.firstWhere((p) => p.id == 'p6'); // 6500
-
   test('el primer pedido es el #1001 y los siguientes suman de a uno', () {
-    final carrito = CarritoProvider()..agregarProducto(fideos);
-    final primero = carrito.confirmarPedido(MetodoPago.tarjeta);
-    carrito.agregarProducto(queso);
-    final segundo = carrito.confirmarPedido(MetodoPago.tarjeta);
+    final carrito = CarritoViewModel()..agregarProducto(yerba);
+    final primero = carrito.armarPedido(MetodoPago.debito);
+    carrito
+      ..vaciarCarrito()
+      ..agregarProducto(queso);
+    final segundo = carrito.armarPedido(MetodoPago.debito);
 
     expect(primero.numero, 1001);
     expect(segundo.numero, 1002);
   });
 
   test('el total es la suma de precio por cantidad de cada ítem', () {
-    final carrito = CarritoProvider()
-      ..agregarProducto(fideos)
-      ..agregarProducto(fideos)
-      ..agregarProducto(fideos)
+    final carrito = CarritoViewModel()
+      ..agregarProducto(yerba)
+      ..agregarProducto(yerba)
+      ..agregarProducto(yerba)
       ..agregarProducto(queso);
 
-    expect(carrito.total, 1200 * 3 + 6500);
+    expect(carrito.total, 3800 * 3 + 6500);
     expect(carrito.cantidadTotal, 4);
   });
 
   test('el pedido conserva los ítems aunque el carrito se vacíe', () {
-    final carrito = CarritoProvider()..agregarProducto(queso);
-    final pedido = carrito.confirmarPedido(MetodoPago.mercadoPago);
+    final carrito = CarritoViewModel()..agregarProducto(queso);
+    final pedido = carrito.armarPedido(MetodoPago.billeteraMercadoPago);
+    carrito.vaciarCarrito();
 
     expect(carrito.estaVacio, isTrue);
     expect(pedido.items.single.producto.id, 'p6');
