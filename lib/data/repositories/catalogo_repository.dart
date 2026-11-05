@@ -32,6 +32,29 @@ class CatalogoRepository {
     return producto;
   }
 
+  Future<void> cambiarPrecio(String id, double precio) =>
+      _actualizar(id, {'precio': precio});
+
+  Future<void> cambiarDisponible(String id, bool disponible) =>
+      _actualizar(id, {'disponible': disponible});
+
+  Future<void> eliminar(String id) async {
+    await _service.eliminarProducto(id);
+    final cache = _cache;
+    if (cache == null) return;
+    _cache = List.unmodifiable(cache.where((producto) => producto.id != id));
+  }
+
+  Future<void> _actualizar(String id, Map<String, dynamic> cambios) async {
+    final datos = await _service.actualizarProducto(id, cambios);
+    final actualizado = Producto.fromJson(datos);
+    final cache = _cache;
+    if (cache == null) return;
+    _cache = List.unmodifiable([
+      for (final producto in cache) producto.id == id ? actualizado : producto,
+    ]);
+  }
+
   Future<T> _conUnReintento<T>(Future<T> Function() pedido) async {
     try {
       return await pedido();

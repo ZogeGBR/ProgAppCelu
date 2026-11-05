@@ -11,6 +11,7 @@ class Producto {
     required this.categoria,
     this.emoji = emojiPorDefecto,
     this.descripcion = '',
+    this.disponible = true,
   });
 
   factory Producto.fromJson(Map<String, dynamic> json) {
@@ -21,6 +22,7 @@ class Producto {
       categoria: json['categoria'] as String,
       emoji: json['emoji'] as String? ?? emojiPorDefecto,
       descripcion: json['descripcion'] as String? ?? '',
+      disponible: json['disponible'] as bool? ?? true,
     );
   }
 
@@ -33,6 +35,9 @@ class Producto {
   final String emoji;
   final String descripcion;
 
+  /// False cuando Don Ceferino marcó que hoy no hay.
+  final bool disponible;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'nombre': nombre,
@@ -40,5 +45,6 @@ class Producto {
         'categoria': categoria,
         'emoji': emoji,
         'descripcion': descripcion,
+        'disponible': disponible,
       };
 }

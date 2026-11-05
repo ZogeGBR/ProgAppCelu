@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'config/dependencias.dart';
+import 'ui/almacen/view_models/almacen_view_model.dart';
 import 'ui/carrito/view_models/carrito_view_model.dart';
 import 'ui/catalogo/view_models/catalogo_view_model.dart';
 import 'ui/core/tema.dart';
 import 'ui/escaner/view_models/escaner_view_model.dart';
 import 'ui/inicio/view_models/navegacion_view_model.dart';
 import 'ui/inicio/widgets/inicio_screen.dart';
+import 'ui/reparto/view_models/reparto_view_model.dart';
 import 'ui/seguimiento/view_models/seguimiento_view_model.dart';
+import 'ui/sesion/view_models/sesion_view_model.dart';
 
 void main() {
   runApp(FreshMarketApp(dependencias: Dependencias.desdeConfiguracion()));
@@ -32,6 +35,9 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
   late final CatalogoViewModel _catalogo;
   late final SeguimientoViewModel _seguimiento;
   late final EscanerViewModel _escaner;
+  late final SesionViewModel _sesion;
+  late final AlmacenViewModel _almacen;
+  late final RepartoViewModel _reparto;
 
   @override
   void initState() {
@@ -41,10 +47,19 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     _carrito = CarritoViewModel();
     _catalogo = CatalogoViewModel(repositorio: dependencias.catalogo);
     _seguimiento = SeguimientoViewModel(repositorio: dependencias.seguimiento);
+    _sesion = SesionViewModel(repositorio: dependencias.sesion);
+    _almacen = AlmacenViewModel(
+      repositorio: dependencias.catalogo,
+      alCambiarCatalogo: _catalogo.cargar,
+    );
+    _reparto = RepartoViewModel(repositorio: dependencias.reparto);
     _escaner = EscanerViewModel(
       etiquetado: dependencias.etiquetado,
       catalogo: dependencias.catalogo,
-      alGuardar: _catalogo.cargar,
+      alGuardar: () {
+        unawaited(_catalogo.cargar());
+        unawaited(_almacen.cargar());
+      },
     );
     unawaited(_catalogo.cargar());
   }
@@ -56,6 +71,9 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     _catalogo.dispose();
     _seguimiento.dispose();
     _escaner.dispose();
+    _sesion.dispose();
+    _almacen.dispose();
+    _reparto.dispose();
     super.dispose();
   }
 
@@ -71,8 +89,11 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
         carrito: _carrito,
         seguimiento: _seguimiento,
         escaner: _escaner,
+        sesion: _sesion,
+        almacen: _almacen,
+        reparto: _reparto,
         pagoRepositorio: widget.dependencias.pago,
-        mostrarModoDueno: widget.dependencias.mostrarModoDueno,
+        pistaClaves: widget.dependencias.pistaClaves,
       ),
     );
   }

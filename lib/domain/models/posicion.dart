@@ -10,6 +10,8 @@ class Posicion {
   final double latitud;
   final double longitud;
 
+  Map<String, dynamic> toJson() => {'lat': latitud, 'lng': longitud};
+
   @override
   bool operator ==(Object other) =>
       other is Posicion &&

@@ -68,6 +68,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Usamos la cámara para sacarle una foto al producto y armar su etiqueta.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Si repartís pedidos, usamos tu ubicación para que el cliente vea por dónde vas.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Podés elegir una foto guardada del producto para armar su etiqueta.</string>
 </dict>

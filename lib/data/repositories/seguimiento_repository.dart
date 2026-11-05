@@ -9,6 +9,7 @@ class SeguimientoRepository {
 
   final SeguimientoService _service;
 
-  Stream<SeguimientoPedido> seguir(Pedido pedido) =>
-      _service.seguirPedido(pedido.id).map(SeguimientoPedido.fromJson);
+  Stream<SeguimientoPedido> seguir(Pedido pedido) => _service
+      .seguirPedido(pedido.id, destino: pedido.destino?.toJson())
+      .map(SeguimientoPedido.fromJson);
 }

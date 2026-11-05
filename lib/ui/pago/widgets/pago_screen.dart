@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/item_carrito.dart';
 import '../../../domain/models/metodo_pago.dart';
+import '../../../domain/models/posicion.dart';
 import '../../core/formato.dart';
 import '../../core/widgets/vista_mensaje.dart';
 import '../view_models/pago_view_model.dart';
+import 'elegir_ubicacion_screen.dart';
 import 'metodo_pago_ui.dart';
 
 /// Pantalla de pago con Mercado Pago (débito, crédito o dinero en cuenta).
@@ -62,15 +64,24 @@ class _PagoScreenState extends State<PagoScreen> {
                   items: widget.items,
                   total: widget.total,
                 ),
-              PasoPago.abriendoMercadoPago =>
-                const VistaCargando(texto: 'Abriendo Mercado Pago...'),
+              PasoPago.abriendoMercadoPago => VistaCargando(
+                  texto: _viewModel.esEfectivo
+                      ? 'Confirmando tu pedido...'
+                      : 'Abriendo Mercado Pago...',
+                ),
               PasoPago.esperandoConfirmacion =>
                 _EsperandoConfirmacion(onCancelar: _viewModel.volverAElegir),
               PasoPago.aprobado => VistaMensaje(
                   icono: Icons.check_circle,
-                  titulo: '¡Listo! Tu pago fue aprobado.',
-                  detalle: 'Pedido #${_viewModel.pedido?.numero}. '
-                      'Ya lo estamos preparando.',
+                  titulo: _viewModel.esEfectivo
+                      ? '¡Listo! Tu pedido está confirmado.'
+                      : '¡Listo! Tu pago fue aprobado.',
+                  detalle: _viewModel.esEfectivo
+                      ? 'Pedido #${_viewModel.pedido?.numero}. Le pagás '
+                          '${formatearPrecio(widget.total)} al repartidor '
+                          'cuando llegue.'
+                      : 'Pedido #${_viewModel.pedido?.numero}. '
+                          'Ya lo estamos preparando.',
                   textoBoton: 'Ver mi pedido',
                   onBoton: () => Navigator.pop(context),
                 ),
@@ -98,6 +109,52 @@ class _PagoScreenState extends State<PagoScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Escribir la dirección es obligatorio; marcarla en el mapa, no: así quien
+/// no se lleva bien con los mapas también puede comprar.
+class _Direccion extends StatelessWidget {
+  const _Direccion({required this.viewModel});
+
+  final PagoViewModel viewModel;
+
+  Future<void> _marcarEnMapa(BuildContext context) async {
+    final destino = await Navigator.of(context).push<Posicion>(
+      MaterialPageRoute(
+        builder: (_) => ElegirUbicacionScreen(inicial: viewModel.destino),
+      ),
+    );
+    if (destino != null) viewModel.marcarDestino(destino);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final marcada = viewModel.destino != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          initialValue: viewModel.direccion,
+          onChanged: viewModel.cambiarDireccion,
+          textCapitalization: TextCapitalization.words,
+          style: const TextStyle(fontSize: 18),
+          decoration: const InputDecoration(
+            labelText: 'Calle y número',
+            hintText: 'Por ejemplo: San Martín 1234',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => _marcarEnMapa(context),
+          icon: Icon(marcada ? Icons.check_circle : Icons.map_outlined),
+          label: Text(
+            marcada ? 'Ya marcaste tu casa' : 'Marcar mi casa en el mapa',
+          ),
+        ),
+      ],
     );
   }
 }
@@ -162,7 +219,11 @@ class _ElegirMetodo extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Text('1. Elegí cómo querés pagar', style: tema.textTheme.titleMedium),
+        Text('1. ¿A dónde te lo llevamos?', style: tema.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        _Direccion(viewModel: viewModel),
+        const SizedBox(height: 24),
+        Text('2. Elegí cómo querés pagar', style: tema.textTheme.titleMedium),
         const SizedBox(height: 12),
         for (final opcion in MetodoPago.values)
           _OpcionPago(
@@ -171,20 +232,28 @@ class _ElegirMetodo extends StatelessWidget {
             onTap: () => viewModel.elegirMetodo(opcion),
           ),
         const SizedBox(height: 16),
-        Text('2. Tocá pagar', style: tema.textTheme.titleMedium),
+        Text(
+          viewModel.esEfectivo ? '3. Confirmá' : '3. Tocá pagar',
+          style: tema.textTheme.titleMedium,
+        ),
         const SizedBox(height: 4),
-        const Text(
-          'Te llevamos a Mercado Pago para que pagues seguro. '
-          'Cuando termines, volvé a esta app.',
+        Text(
+          viewModel.esEfectivo
+              ? 'Te lo llevamos y le pagás al repartidor.'
+              : 'Te llevamos a Mercado Pago para que pagues seguro. '
+                  'Cuando termines, volvé a esta app.',
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: viewModel.puedePagar ? viewModel.pagar : null,
           icon: const Icon(Icons.lock_outline),
           label: Text(
-            metodo == null
-                ? 'Elegí cómo pagar'
-                : 'Pagar ${formatearPrecio(total)}',
+            switch ((viewModel.faltaDireccion, metodo)) {
+              (true, _) => 'Escribí tu dirección',
+              (false, null) => 'Elegí cómo pagar',
+              (false, MetodoPago.efectivo) => 'Confirmar pedido',
+              (false, _) => 'Pagar ${formatearPrecio(total)}',
+            },
           ),
         ),
       ],

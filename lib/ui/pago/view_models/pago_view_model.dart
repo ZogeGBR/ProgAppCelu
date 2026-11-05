@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/pago_repository.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/pedido.dart';
+import '../../../domain/models/posicion.dart';
 import '../../../domain/models/resultado_pago.dart';
 
 /// Pasos de la pantalla de pago.
@@ -37,16 +38,23 @@ class PagoViewModel extends ChangeNotifier {
   final void Function(Pedido pedido) _alAprobar;
 
   MetodoPago? _metodo;
+  String _direccion = '';
+  Posicion? _destino;
   PasoPago _paso = PasoPago.eligiendo;
   Pedido? _pedido;
   StreamSubscription<ResultadoPago>? _suscripcion;
   bool _descartado = false;
 
   MetodoPago? get metodoElegido => _metodo;
+  String get direccion => _direccion;
+  Posicion? get destino => _destino;
+  bool get faltaDireccion => _direccion.trim().isEmpty;
+  bool get esEfectivo => _metodo == MetodoPago.efectivo;
   PasoPago get paso => _paso;
   Pedido? get pedido => _pedido;
 
-  bool get puedePagar => _metodo != null && _paso == PasoPago.eligiendo;
+  bool get puedePagar =>
+      _metodo != null && !faltaDireccion && _paso == PasoPago.eligiendo;
 
   bool get estaOcupado =>
       _paso == PasoPago.abriendoMercadoPago ||
@@ -58,21 +66,43 @@ class PagoViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void cambiarDireccion(String direccion) {
+    _direccion = direccion;
+    notifyListeners();
+  }
+
+  void marcarDestino(Posicion destino) {
+    _destino = destino;
+    notifyListeners();
+  }
+
   Future<void> pagar() async {
     final metodo = _metodo;
-    if (metodo == null || estaOcupado) return;
+    if (metodo == null || !puedePagar) return;
 
-    final pedido = _armarPedido(metodo);
-    _pedido = pedido;
+    final armado = _armarPedido(metodo).copiarCon(
+      direccion: _direccion.trim(),
+      destino: _destino,
+    );
+    _pedido = armado;
     _cambiarPaso(PasoPago.abriendoMercadoPago);
 
+    final Pedido pedido;
     try {
-      await _repositorio.iniciarPago(pedido);
+      pedido = await _repositorio.iniciarPago(armado);
     } on Exception {
       _cambiarPaso(PasoPago.error);
       return;
     }
     if (_descartado) return;
+    _pedido = pedido;
+
+    // En efectivo no hay nada que confirmar: se paga al recibir.
+    if (metodo == MetodoPago.efectivo) {
+      _alAprobar(pedido);
+      _cambiarPaso(PasoPago.aprobado);
+      return;
+    }
 
     _cambiarPaso(PasoPago.esperandoConfirmacion);
     _suscripcion = _repositorio.seguirEstado(pedido.id).listen(

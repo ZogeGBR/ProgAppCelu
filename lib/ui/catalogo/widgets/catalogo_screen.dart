@@ -14,16 +14,29 @@ class CatalogoScreen extends StatelessWidget {
     required this.viewModel,
     required this.carrito,
     required this.alVerCarrito,
+    this.alIngresar,
   });
 
   final CatalogoViewModel viewModel;
   final CarritoViewModel carrito;
   final VoidCallback alVerCarrito;
 
+  /// Abre el ingreso del dueño o del repartidor. Null si ya ingresaron.
+  final VoidCallback? alIngresar;
+
   @override
   Widget build(BuildContext context) {
+    final alIngresar = this.alIngresar;
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          if (alIngresar != null)
+            IconButton(
+              tooltip: 'Soy del almacén',
+              onPressed: alIngresar,
+              icon: const Icon(Icons.storefront_outlined),
+            ),
+        ],
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

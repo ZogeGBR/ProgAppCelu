@@ -26,6 +26,17 @@ void main() {
   // Deja que el stream entregue lo que se emitió.
   Future<void> esperar() => Future<void>.delayed(Duration.zero);
 
+  test('el destino que marcó el cliente llega al servicio', () {
+    final carrito = CarritoViewModel()..agregarProducto(yerba);
+    final pedido = carrito.armarPedido(MetodoPago.debito).copiarCon(
+          destino: const Posicion(latitud: -32.9, longitud: -68.85),
+        );
+
+    viewModel.seguir(pedido);
+
+    expect(service.ultimoDestino, {'lat': -32.9, 'lng': -68.85});
+  });
+
   test('arranca en "recibido" y sin mapa', () {
     expect(viewModel.hayPedido, isTrue);
     expect(viewModel.estado, EstadoPedido.recibido);
