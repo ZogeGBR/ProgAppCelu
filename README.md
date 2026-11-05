@@ -6,8 +6,9 @@ FreshMarket (almacén de barrio).
 
 **Versión 3:** arquitectura en capas (MVVM), mapa con el repartidor en
 bicicleta en tiempo real, carga de productos con una foto (IA), pagos con
-Mercado Pago (débito, crédito y dinero en cuenta) y una navegación pensada
-para personas que no usan mucho el celular. El detalle de qué se mejoró y
+Mercado Pago (débito, crédito y dinero en cuenta) o en efectivo al recibir,
+dirección de entrega, modo repartidor con GPS, administración del almacén y
+una navegación pensada para personas que no usan mucho el celular. El detalle de qué se mejoró y
 qué falta está en [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
 
 ## Cómo correrlo
@@ -21,7 +22,10 @@ flutter run
 
 Sin configuración, todo funciona **simulado**: catálogo de ejemplo, pago
 que se aprueba solo, repartidor que recorre el centro de Mendoza y una IA
-que devuelve una etiqueta de ejemplo. La cámara sí es real.
+que devuelve una etiqueta de ejemplo. La cámara y el GPS sí son reales.
+
+Para entrar como dueño o repartidor: ícono del almacén arriba a la derecha en
+"Comprar", clave `dueno` o `repartidor`.
 
 ### 2. App + backend (pagos y mapa reales)
 
@@ -45,23 +49,30 @@ flutter run --dart-define=URL_BACKEND=http://10.0.2.2:3000
 | `MP_WEBHOOK_SECRET` | Validar la firma de los avisos de Mercado Pago | No se valida la firma |
 | `URL_PUBLICA` | URL **https** del backend, para que Mercado Pago avise y vuelva a la app | La app igual consulta el estado cada 3 s |
 | `GEMINI_API_KEY` | Reconocer productos con IA (Google AI Studio) | Etiqueta de ejemplo |
-| `CLAVE_REPARTIDOR` | Que solo la app del repartidor pueda mandar su posición | Cualquiera puede mandarla |
+| `CLAVE_DUENO` | Entrar a "Mi almacén" | Nadie puede entrar como dueño |
+| `CLAVE_REPARTIDOR` | Entrar a "Repartir" | Nadie puede entrar como repartidor |
+| `SECRETO_SESION` | Firmar las sesiones | Se genera al arrancar: hay que volver a ingresar en cada reinicio |
+| `SIMULAR_REPARTO` | `true` o `false`: simular al repartidor mientras no mande su GPS | Se simula solo si Mercado Pago también está simulado |
+| `RUTA_BD` | Archivo de la base de datos (SQLite) | `freshmarket.db` |
+
+Hace falta **Node 22.13 o más nuevo**, que ya trae SQLite.
 
 > **Seguridad:** ninguna clave va en la app Flutter. La app solo conoce
 > `URL_BACKEND`. El backend recalcula el total con sus propios precios,
 > así que nadie puede pagar menos modificando la app.
 
-Para ocultar la sección del dueño en la versión para clientes:
-`--dart-define=MODO_DUENO=false`.
-
 ### Pruebas y calidad
 
 ```bash
-dart format .
+dart format lib test
 flutter analyze
-flutter test           # app: ViewModels con fakes + flujo completo
-cd backend && npm test # backend: 12 pruebas
+flutter test           # app: 66 pruebas (ViewModels con fakes y pantallas)
+cd backend && npm test # backend: 27 pruebas
+node scripts/carga.mjs 500   # (desde backend/) prueba de carga
 ```
+
+> `dart format .` falla después de compilar porque entra a `build/`: por eso se
+> indican las carpetas.
 
 > **Ojo con la ruta en Windows:** si la carpeta tiene tildes o símbolos
 > (por ej. `5° Semestre\Programación...`), el Android Gradle Plugin corta
@@ -84,6 +95,9 @@ lib/
 │   │   ├── pago_service.dart        (Mercado Pago vía backend / simulado)
 │   │   ├── seguimiento_service.dart (backend cada 3 s / simulado)
 │   │   ├── etiquetado_service.dart  (IA vía backend / simulada)
+│   │   ├── sesion_service.dart      (ingreso con clave)
+│   │   ├── reparto_service.dart     (pedidos y posición del repartidor)
+│   │   ├── ubicacion_service.dart   (GPS con geolocator)
 │   │   └── camara_service.dart      (image_picker)
 │   └── repositories/            ← JSON → modelo, caché, reintentos, esperas
 └── ui/
@@ -93,8 +107,11 @@ lib/
     ├── carrito/                 ← "Mi carrito" (CarritoViewModel)
     ├── pago/                    ← pago con Mercado Pago
     ├── seguimiento/             ← "Mi pedido" con el mapa del repartidor
-    └── escaner/                 ← "Cargar": producto nuevo con una foto
-backend/                         ← Node + Express (claves, pagos, IA, reparto)
+    ├── escaner/                 ← producto nuevo con una foto
+    ├── sesion/                  ← ingreso del dueño y del repartidor
+    ├── almacen/                 ← "Mi almacén": precios, sin stock, borrar
+    └── reparto/                 ← "Repartir": pedidos y envío del GPS
+backend/                         ← Node + Express + SQLite (pagos, IA, reparto, sesiones)
 test/                            ← pruebas con fakes (sin internet)
 ```
 
@@ -131,15 +148,16 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
   tiene tiempo límite. Después de un `await`, chequear `mounted`.
 - **Textos de pantalla:** cortos, sin palabras técnicas, botones de al menos
   56 dp con ícono y texto.
-- **Antes de cada commit:** `dart format .`, `flutter analyze` y `flutter test`.
+- **Antes de cada commit:** `dart format lib test`, `flutter analyze` y
+  `flutter test`.
 
 ## De la entrevista al código
 
 | Pedido de Don Ceferino | Dónde se resuelve |
 |---|---|
-| Ver el catálogo con precio del día | `ui/catalogo` + `CatalogoRepository` (backend o local) |
+| Ver el catálogo con precio del día | `ui/catalogo` + `CatalogoRepository` (backend o local); el dueño lo cambia en `ui/almacen` |
 | Pagar "con tarjeta o Mercado Pago" | `ui/pago` + `PagoRepository` + `backend/src/pagos.js` (Checkout Pro) |
 | Ver el reparto "como el GPS de un taxi" | `ui/seguimiento/widgets/mapa_repartidor.dart` + `backend/src/seguimiento.js` |
 | Cargar productos sin saber de tecnología | `ui/escaner` + `backend/src/ia.js` (foto → etiqueta) |
 | Que sea fácil para clientes mayores | `ui/inicio` (barra de 3 botones) + `ui/core/tema.dart` |
-| 5.000 pedidos simultáneos en diciembre, sin pagar servidores | **Incompatibles**: ver `INFORME_MEJORAS.md`, sección "Qué faltaría" |
+| 5.000 pedidos simultáneos en Nochebuena, sin pagar servidores | **Incompatibles.** Con la profesora acordamos un pico realista de hasta 500: ver `INFORME_MEJORAS.md`, secciones "Pruebas" y "Qué faltaría" |
