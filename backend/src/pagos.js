@@ -5,12 +5,48 @@
 import crypto from 'node:crypto';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 
+import { obtenerBd } from './bd.js';
 import { buscarProducto, ErrorDeValidacion } from './catalogo.js';
 
 const MAXIMA_CANTIDAD = 99;
+const LARGO_ID = 64;
+const LARGO_DIRECCION = 200;
 
-/** Pedidos en memoria: id -> { pedido, items, total, estadoPago, aprobadoEn } */
-export const pedidos = new Map();
+/** Se paga al repartidor: el pedido no pasa por Mercado Pago. */
+const EFECTIVO = 'efectivo';
+
+/** Convierte una fila de la base en el registro que usa el resto del backend. */
+function aRegistro(fila) {
+  return {
+    id: fila.id,
+    numero: fila.numero,
+    metodoPago: fila.metodo_pago,
+    items: JSON.parse(fila.items),
+    total: fila.total,
+    direccion: fila.direccion,
+    destino:
+      fila.destino_lat === null ? null : { lat: fila.destino_lat, lng: fila.destino_lng },
+    estadoPago: fila.estado_pago,
+    aprobadoEn: fila.aprobado_en,
+    entregado: fila.entregado === 1,
+  };
+}
+
+export function buscarPedido(id) {
+  const fila = obtenerBd().prepare('SELECT * FROM pedidos WHERE id = ?').get(String(id));
+  return fila ? aRegistro(fila) : null;
+}
+
+/** Pedidos confirmados que el repartidor todavía tiene que llevar. */
+export function pedidosParaRepartir() {
+  return obtenerBd()
+    .prepare(
+      `SELECT * FROM pedidos WHERE estado_pago = 'aprobado' AND entregado = 0
+       ORDER BY aprobado_en`,
+    )
+    .all()
+    .map(aRegistro);
+}
 
 // Qué medios NO se muestran según lo que eligió la persona en la app.
 // Así ve directamente lo que eligió y no se confunde con otras opciones.
@@ -33,7 +69,7 @@ export function armarItems(pedido) {
   if (!pedido?.id || !Array.isArray(pedido.items) || pedido.items.length === 0) {
     throw new ErrorDeValidacion('El pedido no tiene productos.');
   }
-  if (!(pedido.metodoPago in EXCLUSIONES)) {
+  if (pedido.metodoPago !== EFECTIVO && !(pedido.metodoPago in EXCLUSIONES)) {
     throw new ErrorDeValidacion('Medio de pago desconocido.');
   }
 
@@ -41,6 +77,7 @@ export function armarItems(pedido) {
     const producto = buscarProducto(item.productoId);
     const cantidad = Number(item.cantidad);
     if (!producto) throw new ErrorDeValidacion(`No existe el producto ${item.productoId}.`);
+    if (!producto.disponible) throw new ErrorDeValidacion(`No hay más ${producto.nombre}.`);
     if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAXIMA_CANTIDAD) {
       throw new ErrorDeValidacion('Cantidad inválida.');
     }
@@ -54,22 +91,77 @@ export function armarItems(pedido) {
   });
 }
 
+function validarDireccion(valor) {
+  const direccion = String(valor ?? '').trim();
+  if (!direccion) throw new ErrorDeValidacion('Falta la dirección de entrega.');
+  return direccion.slice(0, LARGO_DIRECCION);
+}
+
+function validarDestino(destino) {
+  if (destino === undefined || destino === null) return null;
+  const lat = Number(destino.lat);
+  const lng = Number(destino.lng);
+  if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+    throw new ErrorDeValidacion('La ubicación de entrega no es válida.');
+  }
+  return { lat, lng };
+}
+
+/**
+ * Guarda el pedido. El número lo asigna la base: si lo eligiera cada celular,
+ * dos clientes tendrían el mismo. Un id repetido se rechaza para que nadie
+ * pueda pisar un pedido ya pagado.
+ */
+function guardarPedido(pedido, items, total) {
+  const id = String(pedido.id).slice(0, LARGO_ID);
+  const direccion = validarDireccion(pedido.direccion);
+  const destino = validarDestino(pedido.destino);
+  if (buscarPedido(id)) throw new ErrorDeValidacion('Ese pedido ya existe.');
+
+  // En efectivo no hay nada que esperar: el pedido sale directo.
+  const efectivo = pedido.metodoPago === EFECTIVO;
+  const { lastInsertRowid } = obtenerBd()
+    .prepare(
+      `INSERT INTO pedidos
+         (id, metodo_pago, items, total, direccion, destino_lat, destino_lng,
+          estado_pago, aprobado_en)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      id,
+      pedido.metodoPago,
+      JSON.stringify(items),
+      total,
+      direccion,
+      destino?.lat ?? null,
+      destino?.lng ?? null,
+      efectivo ? 'aprobado' : 'pendiente',
+      efectivo ? Date.now() : null,
+    );
+  return { id, numero: Number(lastInsertRowid) };
+}
+
 export async function crearPreferencia({ cliente, pedido, urlPublica, urlLocal, sandbox }) {
   const items = armarItems(pedido);
   const total = items.reduce((suma, item) => suma + item.unit_price * item.quantity, 0);
-  pedidos.set(pedido.id, { pedido, items, total, estadoPago: 'pendiente', aprobadoEn: null });
+  const { id, numero } = guardarPedido(pedido, items, total);
+
+  if (pedido.metodoPago === EFECTIVO) {
+    return { preferenciaId: null, urlCheckout: null, total, numero };
+  }
 
   if (!cliente) {
     return {
-      preferenciaId: `simulada-${pedido.id}`,
-      urlCheckout: `${urlLocal}/pago/simulado/${encodeURIComponent(pedido.id)}`,
+      preferenciaId: `simulada-${id}`,
+      urlCheckout: `${urlLocal}/pago/simulado/${encodeURIComponent(id)}`,
       total,
+      numero,
     };
   }
 
   const cuerpo = {
     items,
-    external_reference: pedido.id,
+    external_reference: id,
     statement_descriptor: 'FRESHMARKET',
     payment_methods: {
       excluded_payment_types: EXCLUSIONES[pedido.metodoPago].map((id) => ({ id })),
@@ -89,6 +181,7 @@ export async function crearPreferencia({ cliente, pedido, urlPublica, urlLocal, 
     preferenciaId: preferencia.id,
     urlCheckout: sandbox ? preferencia.sandbox_init_point : preferencia.init_point,
     total,
+    numero,
   };
 }
 
@@ -102,10 +195,11 @@ export function traducirEstado(estadoMercadoPago) {
 }
 
 export function marcarPago(pedidoId, estado) {
-  const registro = pedidos.get(pedidoId);
+  const registro = buscarPedido(pedidoId);
   if (!registro || registro.estadoPago === 'aprobado') return;
-  registro.estadoPago = estado;
-  if (estado === 'aprobado') registro.aprobadoEn = Date.now();
+  obtenerBd()
+    .prepare('UPDATE pedidos SET estado_pago = ?, aprobado_en = ? WHERE id = ?')
+    .run(estado, estado === 'aprobado' ? Date.now() : null, pedidoId);
 }
 
 /**
@@ -113,7 +207,7 @@ export function marcarPago(pedidoId, estado) {
  * pregunta a Mercado Pago buscando por la referencia externa.
  */
 export async function consultarEstado({ cliente, pedidoId }) {
-  const registro = pedidos.get(pedidoId);
+  const registro = buscarPedido(pedidoId);
   if (!registro) return null;
   if (registro.estadoPago !== 'pendiente' || !cliente) return registro.estadoPago;
 
@@ -122,7 +216,7 @@ export async function consultarEstado({ cliente, pedidoId }) {
   });
   const ultimo = resultado.results?.[0];
   if (ultimo) marcarPago(pedidoId, traducirEstado(ultimo.status));
-  return registro.estadoPago;
+  return buscarPedido(pedidoId).estadoPago;
 }
 
 /** Procesa el aviso (webhook) de Mercado Pago de un pago nuevo o actualizado. */

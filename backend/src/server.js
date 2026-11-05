@@ -13,7 +13,14 @@ const app = crearApp({
   geminiApiKey: process.env.GEMINI_API_KEY,
   geminiModelo: process.env.GEMINI_MODELO,
   urlPublica: process.env.URL_PUBLICA,
+  claveDueno: process.env.CLAVE_DUENO,
   claveRepartidor: process.env.CLAVE_REPARTIDOR,
+  rutaBd: process.env.RUTA_BD ?? 'freshmarket.db',
+  secretoSesion: process.env.SECRETO_SESION || undefined,
+  // Sin definir, se simula solo si Mercado Pago también está simulado.
+  simularReparto: process.env.SIMULAR_REPARTO
+    ? process.env.SIMULAR_REPARTO === 'true'
+    : undefined,
 });
 
 app.listen(puerto, () => {
