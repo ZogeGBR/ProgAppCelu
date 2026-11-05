@@ -1,11 +1,16 @@
 // Seguimiento del reparto en bicicleta.
 //
 // El celular del repartidor manda su posición con POST /repartidores/posicion.
-// Si todavía no hay app de repartidor (demo), se simula el recorrido.
-import { pedidos } from './pagos.js';
+// En la demo, mientras no mande nada, se simula el recorrido. Con pagos reales
+// la simulación se apaga: un cliente nunca tiene que ver un repartidor inventado.
+import { obtenerBd } from './bd.js';
+import { buscarPedido } from './pagos.js';
 
 const ALMACEN = { lat: -32.8895, lng: -68.8458 };
 const DESTINO_DEMO = { lat: -32.8805, lng: -68.8335 };
+
+const RADIO_TIERRA_KM = 6371;
+const VELOCIDAD_BICI_KM_H = 15;
 
 // Duraciones de la simulación (en milisegundos).
 export const TIEMPOS = {
@@ -14,65 +19,83 @@ export const TIEMPOS = {
   viaje: 120_000,
 };
 
-/** Última posición conocida de cada pedido: pedidoId -> { lat, lng, nombre, en } */
-const posiciones = new Map();
-
 export function registrarPosicion({ pedidoId, lat, lng, nombre }) {
   const latitud = Number(lat);
   const longitud = Number(lng);
   const valida =
     Number.isFinite(latitud) && Math.abs(latitud) <= 90 &&
     Number.isFinite(longitud) && Math.abs(longitud) <= 180;
-  if (!pedidos.has(pedidoId) || !valida) return false;
+  if (!valida || !buscarPedido(pedidoId)) return false;
 
-  posiciones.set(pedidoId, {
-    lat: latitud,
-    lng: longitud,
-    nombre: String(nombre ?? 'Repartidor').slice(0, 40),
-    en: Date.now(),
-  });
+  obtenerBd()
+    .prepare(
+      `INSERT INTO posiciones (pedido_id, lat, lng, nombre, en) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (pedido_id) DO UPDATE SET
+         lat = excluded.lat, lng = excluded.lng, nombre = excluded.nombre, en = excluded.en`,
+    )
+    .run(pedidoId, latitud, longitud, String(nombre ?? 'Repartidor').slice(0, 40), Date.now());
   return true;
 }
 
 export function marcarEntregado(pedidoId) {
-  const registro = pedidos.get(pedidoId);
+  const registro = buscarPedido(pedidoId);
   if (!registro || registro.estadoPago !== 'aprobado') return false;
-  registro.entregado = true;
+  obtenerBd().prepare('UPDATE pedidos SET entregado = 1 WHERE id = ?').run(pedidoId);
   return true;
 }
 
-export function seguimientoDe(pedidoId, ahora = Date.now()) {
-  const registro = pedidos.get(pedidoId);
+/** Distancia en km entre dos puntos (fórmula de Haversine). */
+export function distanciaKm(a, b) {
+  const rad = (grados) => (grados * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * RADIO_TIERRA_KM * Math.asin(Math.sqrt(h));
+}
+
+function minutosHasta(desde, hasta) {
+  return Math.max(1, Math.ceil((distanciaKm(desde, hasta) / VELOCIDAD_BICI_KM_H) * 60));
+}
+
+export function seguimientoDe(pedidoId, ahora = Date.now(), { simularReparto = true } = {}) {
+  const registro = buscarPedido(pedidoId);
   if (!registro) return null;
   if (registro.estadoPago !== 'aprobado') return { estado: 'recibido' };
 
-  const real = posiciones.get(pedidoId);
+  const destino = registro.destino ?? DESTINO_DEMO;
+  if (registro.entregado) return { estado: 'entregado', destino };
+
+  const real = obtenerBd().prepare('SELECT * FROM posiciones WHERE pedido_id = ?').get(pedidoId);
   if (real) {
     return {
-      estado: registro.entregado ? 'entregado' : 'enCamino',
+      estado: 'enCamino',
       repartidor: { nombre: real.nombre, lat: real.lat, lng: real.lng },
-      destino: DESTINO_DEMO,
+      destino,
+      minutosEstimados: minutosHasta(real, destino),
     };
   }
-  return simular(ahora - registro.aprobadoEn);
+  if (!simularReparto) return { estado: 'enPreparacion', destino };
+  return simular(ahora - registro.aprobadoEn, destino);
 }
 
-function simular(transcurrido) {
+function simular(transcurrido, destino) {
   const { recibido, preparacion, viaje } = TIEMPOS;
   if (transcurrido < recibido) return { estado: 'recibido' };
   if (transcurrido < recibido + preparacion) return { estado: 'enPreparacion' };
 
   const avance = (transcurrido - recibido - preparacion) / viaje;
-  if (avance >= 1) return { estado: 'entregado', destino: DESTINO_DEMO };
+  if (avance >= 1) return { estado: 'entregado', destino };
 
   return {
     estado: 'enCamino',
     repartidor: {
       nombre: 'Tobías',
-      lat: ALMACEN.lat + (DESTINO_DEMO.lat - ALMACEN.lat) * avance,
-      lng: ALMACEN.lng + (DESTINO_DEMO.lng - ALMACEN.lng) * avance,
+      lat: ALMACEN.lat + (destino.lat - ALMACEN.lat) * avance,
+      lng: ALMACEN.lng + (destino.lng - ALMACEN.lng) * avance,
     },
-    destino: DESTINO_DEMO,
+    destino,
     minutosEstimados: Math.ceil(((1 - avance) * viaje) / 60_000),
   };
 }
