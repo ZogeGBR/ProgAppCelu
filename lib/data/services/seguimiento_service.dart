@@ -82,7 +82,9 @@ class SeguimientoServiceSimulado implements SeguimientoService {
       'estado': 'enCamino',
       'repartidor': _repartidorEn(avance, destino),
       'destino': destino,
-      'minutosEstimados': ((1 - avance) * _minutosDeViaje).ceil(),
+      // Mientras no llegó, nunca dice "0 min".
+      'minutosEstimados':
+          ((1 - avance) * _minutosDeViaje).ceil().clamp(1, _minutosDeViaje),
     };
   }
 
