@@ -23,9 +23,8 @@ class SeguimientoServiceHttp implements SeguimientoService {
   @override
   Stream<Map<String, dynamic>> seguirPedido(String pedidoId) {
     return Stream<void>.periodic(intervalo).asyncMap(
-      (_) async =>
-          await _api.get('/pedidos/$pedidoId/seguimiento')
-              as Map<String, dynamic>,
+      (_) async => await _api.get('/pedidos/$pedidoId/seguimiento')
+          as Map<String, dynamic>,
     );
   }
 }
@@ -71,7 +70,8 @@ class SeguimientoServiceSimulado implements SeguimientoService {
     };
   }
 
-  Map<String, dynamic> get _destino => {'lat': _cliente.lat, 'lng': _cliente.lng};
+  Map<String, dynamic> get _destino =>
+      {'lat': _cliente.lat, 'lng': _cliente.lng};
 
   Map<String, dynamic> _repartidorEn(double avance) => {
         'nombre': 'Tobías',

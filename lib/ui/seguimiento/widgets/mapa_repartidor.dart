@@ -82,7 +82,7 @@ class _MapaRepartidorState extends State<MapaRepartidor> {
             ),
           ],
         ),
-        RichAttributionWidget(
+        const RichAttributionWidget(
           attributions: [TextSourceAttribution('OpenStreetMap contributors')],
         ),
       ],

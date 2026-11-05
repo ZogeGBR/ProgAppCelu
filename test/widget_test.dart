@@ -64,7 +64,13 @@ void main() {
 
     await tester.tap(find.text('Tarjeta de débito'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.textContaining('Pagar \$'));
+    // ListView construye a demanda: hay que desplazar hasta que el botón exista.
+    await tester.scrollUntilVisible(
+      find.textContaining('Pagar \$'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Pagar \$'));
     await tester.pump(); // Abre Mercado Pago (simulado).
     await tester.pump(); // Empieza a esperar la confirmación.

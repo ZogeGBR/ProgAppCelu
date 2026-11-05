@@ -105,7 +105,8 @@ class _ListaDeProductos extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(categoria, style: const TextStyle(fontSize: 16)),
+                    label:
+                        Text(categoria, style: const TextStyle(fontSize: 16)),
                     selected: categoria == viewModel.categoriaElegida,
                     onSelected: (_) => viewModel.elegirCategoria(categoria),
                   ),
