@@ -117,9 +117,8 @@ class PagoServiceFalso implements PagoService {
 
   @override
   Future<Map<String, dynamic>> consultarEstado(String pedidoId) async {
-    final indice = _consultas < respuestas.length
-        ? _consultas
-        : respuestas.length - 1;
+    final indice =
+        _consultas < respuestas.length ? _consultas : respuestas.length - 1;
     _consultas++;
     return {'estado': respuestas[indice]};
   }

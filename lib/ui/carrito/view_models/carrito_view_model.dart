@@ -10,7 +10,8 @@ import '../../../domain/models/producto.dart';
 /// Fórmula del apunte: dato privado -> getter público -> comando que
 /// cambia el dato y termina con notifyListeners().
 class CarritoViewModel extends ChangeNotifier {
-  CarritoViewModel({DateTime Function()? reloj}) : _reloj = reloj ?? DateTime.now;
+  CarritoViewModel({DateTime Function()? reloj})
+      : _reloj = reloj ?? DateTime.now;
 
   static const primerNumeroDePedido = 1001;
 

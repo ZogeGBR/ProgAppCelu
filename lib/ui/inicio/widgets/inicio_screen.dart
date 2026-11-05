@@ -59,7 +59,8 @@ class InicioScreen extends StatelessWidget {
       total: carrito.total,
       alVerPedido: () => navegacion.irA(Seccion.miPedido),
     );
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => pantalla));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
   }
 
   @override

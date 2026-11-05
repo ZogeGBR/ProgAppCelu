@@ -47,8 +47,7 @@ class SeguimientoScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (viewModel.sinConexion)
-                const _AvisoSinConexion(),
+              if (viewModel.sinConexion) const _AvisoSinConexion(),
               _EtapaActual(estado: viewModel.estado),
               if (viewModel.mostrarMapa && posicion != null) ...[
                 const SizedBox(height: 16),
@@ -141,7 +140,8 @@ class _EtapaActual extends StatelessWidget {
           CircleAvatar(
             radius: 36,
             backgroundColor: tema.colorScheme.primaryContainer,
-            child: Icon(estado.icono, size: 40, color: tema.colorScheme.primary),
+            child:
+                Icon(estado.icono, size: 40, color: tema.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -220,8 +220,7 @@ class _EtapaLinea extends StatelessWidget {
                     ? Icon(Icons.check, size: 18, color: colores.onPrimary)
                     : null,
               ),
-              if (!esUltima)
-                Expanded(child: Container(width: 2, color: color)),
+              if (!esUltima) Expanded(child: Container(width: 2, color: color)),
             ],
           ),
           const SizedBox(width: 12),

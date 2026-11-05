@@ -160,7 +160,8 @@ class _ResumenTotal extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         decoration: BoxDecoration(
           color: tema.colorScheme.surface,
-          border: Border(top: BorderSide(color: tema.colorScheme.outlineVariant)),
+          border:
+              Border(top: BorderSide(color: tema.colorScheme.outlineVariant)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -170,7 +171,7 @@ class _ResumenTotal extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Total ($cantidad productos)',
+                  'Total ($cantidad ${cantidad == 1 ? 'producto' : 'productos'})',
                   style: tema.textTheme.titleMedium,
                 ),
                 Text(

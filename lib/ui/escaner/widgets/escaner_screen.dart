@@ -192,7 +192,8 @@ class _Revision extends StatelessWidget {
                 initialValue: _precioComoTexto(ficha),
                 onChanged: viewModel.cambiarPrecio,
                 keyboardType: TextInputType.number,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 decoration: const InputDecoration(
                   labelText: 'Precio',
                   prefixText: '\$ ',
@@ -209,7 +210,8 @@ class _Revision extends StatelessWidget {
                 children: [
                   for (final categoria in categorias)
                     ChoiceChip(
-                      label: Text(categoria, style: const TextStyle(fontSize: 16)),
+                      label:
+                          Text(categoria, style: const TextStyle(fontSize: 16)),
                       selected: categoria == ficha.categoria,
                       onSelected: (_) => viewModel.cambiarCategoria(categoria),
                     ),

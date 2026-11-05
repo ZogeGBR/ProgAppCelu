@@ -31,8 +31,8 @@ class CatalogoViewModel extends ChangeNotifier {
   List<Producto> get productosVisibles {
     final texto = _busqueda.trim().toLowerCase();
     return _productos.where((producto) {
-      final coincideCategoria = _categoria == todasLasCategorias ||
-          producto.categoria == _categoria;
+      final coincideCategoria =
+          _categoria == todasLasCategorias || producto.categoria == _categoria;
       final coincideTexto =
           texto.isEmpty || producto.nombre.toLowerCase().contains(texto);
       return coincideCategoria && coincideTexto;
