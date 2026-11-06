@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/item_carrito.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/posicion.dart';
+import '../../../domain/models/ubicacion_entrega.dart';
 import '../../core/formato.dart';
 import '../../core/widgets/vista_mensaje.dart';
+import '../view_models/elegir_ubicacion_view_model.dart';
 import '../view_models/pago_view_model.dart';
 import 'elegir_ubicacion_screen.dart';
 import 'metodo_pago_ui.dart';
@@ -19,9 +21,14 @@ class PagoScreen extends StatefulWidget {
     required this.items,
     required this.total,
     required this.alVerPedido,
+    required this.crearElegirUbicacion,
   });
 
   final PagoViewModel viewModel;
+
+  /// Arma el ViewModel del mapa para marcar la casa (con lo ya marcado).
+  final ElegirUbicacionViewModel Function(Posicion? inicial, String direccion)
+      crearElegirUbicacion;
   final List<ItemCarrito> items;
   final double total;
 
@@ -61,6 +68,7 @@ class _PagoScreenState extends State<PagoScreen> {
             body: switch (paso) {
               PasoPago.eligiendo => _ElegirMetodo(
                   viewModel: _viewModel,
+                  crearElegirUbicacion: widget.crearElegirUbicacion,
                   items: widget.items,
                   total: widget.total,
                 ),
@@ -114,30 +122,56 @@ class _PagoScreenState extends State<PagoScreen> {
 }
 
 /// Escribir la dirección es obligatorio; marcarla en el mapa, no: así quien
-/// no se lleva bien con los mapas también puede comprar.
-class _Direccion extends StatelessWidget {
-  const _Direccion({required this.viewModel});
+/// no se lleva bien con los mapas también puede comprar. Si la marca en el
+/// mapa, la calle se escribe sola en el cuadro de texto.
+class _Direccion extends StatefulWidget {
+  const _Direccion({
+    required this.viewModel,
+    required this.crearElegirUbicacion,
+  });
 
   final PagoViewModel viewModel;
+  final ElegirUbicacionViewModel Function(Posicion? inicial, String direccion)
+      crearElegirUbicacion;
 
-  Future<void> _marcarEnMapa(BuildContext context) async {
-    final destino = await Navigator.of(context).push<Posicion>(
-      MaterialPageRoute(
-        builder: (_) => ElegirUbicacionScreen(inicial: viewModel.destino),
-      ),
+  @override
+  State<_Direccion> createState() => _DireccionState();
+}
+
+class _DireccionState extends State<_Direccion> {
+  late final _texto = TextEditingController(text: widget.viewModel.direccion);
+
+  @override
+  void dispose() {
+    _texto.dispose();
+    super.dispose();
+  }
+
+  Future<void> _marcarEnMapa() async {
+    final viewModel = widget.viewModel;
+    final mapa = widget.crearElegirUbicacion(
+      viewModel.destino,
+      viewModel.direccion,
     );
-    if (destino != null) viewModel.marcarDestino(destino);
+    final elegida = await Navigator.of(context).push<UbicacionEntrega>(
+      MaterialPageRoute(builder: (_) => ElegirUbicacionScreen(viewModel: mapa)),
+    );
+    if (!mounted || elegida == null) return;
+    viewModel.marcarDestino(elegida.posicion, direccion: elegida.direccion);
+    // El cuadro de texto muestra lo que quedó en el ViewModel (la calle
+    // encontrada, o lo que ya había escrito si el mapa no encontró calle).
+    _texto.text = viewModel.direccion;
   }
 
   @override
   Widget build(BuildContext context) {
-    final marcada = viewModel.destino != null;
+    final marcada = widget.viewModel.destino != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextFormField(
-          initialValue: viewModel.direccion,
-          onChanged: viewModel.cambiarDireccion,
+          controller: _texto,
+          onChanged: widget.viewModel.cambiarDireccion,
           textCapitalization: TextCapitalization.words,
           style: const TextStyle(fontSize: 18),
           decoration: const InputDecoration(
@@ -148,10 +182,10 @@ class _Direccion extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => _marcarEnMapa(context),
+          onPressed: _marcarEnMapa,
           icon: Icon(marcada ? Icons.check_circle : Icons.map_outlined),
           label: Text(
-            marcada ? 'Ya marcaste tu casa' : 'Marcar mi casa en el mapa',
+            marcada ? 'Cambiar el lugar en el mapa' : 'Marcar mi casa en el mapa',
           ),
         ),
       ],
@@ -162,11 +196,14 @@ class _Direccion extends StatelessWidget {
 class _ElegirMetodo extends StatelessWidget {
   const _ElegirMetodo({
     required this.viewModel,
+    required this.crearElegirUbicacion,
     required this.items,
     required this.total,
   });
 
   final PagoViewModel viewModel;
+  final ElegirUbicacionViewModel Function(Posicion? inicial, String direccion)
+      crearElegirUbicacion;
   final List<ItemCarrito> items;
   final double total;
 
@@ -221,7 +258,10 @@ class _ElegirMetodo extends StatelessWidget {
         const SizedBox(height: 24),
         Text('1. ¿A dónde te lo llevamos?', style: tema.textTheme.titleMedium),
         const SizedBox(height: 12),
-        _Direccion(viewModel: viewModel),
+        _Direccion(
+          viewModel: viewModel,
+          crearElegirUbicacion: crearElegirUbicacion,
+        ),
         const SizedBox(height: 24),
         Text('2. Elegí cómo querés pagar', style: tema.textTheme.titleMedium),
         const SizedBox(height: 12),

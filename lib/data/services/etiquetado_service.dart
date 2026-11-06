@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'api_client.dart';
@@ -20,9 +21,12 @@ class EtiquetadoServiceHttp implements EtiquetadoService {
 
   @override
   Future<Map<String, dynamic>> analizarFoto(Uint8List foto) async {
+    // Pasar 1 MB de foto a texto base64 es trabajo de CPU: se hace en otro
+    // isolate para que la animación de "Mirando la foto..." no se trabe.
+    final imagen = await Isolate.run(() => base64Encode(foto));
     final respuesta = await _api.post(
       '/ia/etiqueta',
-      {'imagenBase64': base64Encode(foto), 'tipo': 'image/jpeg'},
+      {'imagenBase64': imagen, 'tipo': 'image/jpeg'},
       limite: _limiteAnalisis,
     );
     return respuesta as Map<String, dynamic>;

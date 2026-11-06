@@ -1,13 +1,17 @@
+import '../data/repositories/carrito_repository.dart';
 import '../data/repositories/catalogo_repository.dart';
 import '../data/repositories/etiquetado_repository.dart';
 import '../data/repositories/pago_repository.dart';
 import '../data/repositories/reparto_repository.dart';
 import '../data/repositories/seguimiento_repository.dart';
 import '../data/repositories/sesion_repository.dart';
+import '../data/repositories/ubicacion_entrega_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/camara_service.dart';
+import '../data/services/carrito_local_service.dart';
 import '../data/services/catalogo_service.dart';
 import '../data/services/etiquetado_service.dart';
+import '../data/services/geocodificacion_service.dart';
 import '../data/services/pago_service.dart';
 import '../data/services/reparto_service.dart';
 import '../data/services/seguimiento_service.dart';
@@ -31,8 +35,11 @@ abstract final class AppConfig {
 
 /// Arma los repositorios con sus servicios (inyección de dependencias).
 ///
-/// Es el ÚNICO lugar donde se decide qué implementación se usa. Para
-/// pasar de la demo al backend real no se toca ninguna otra clase.
+/// Es el ÚNICO lugar donde se decide qué implementación se usa (patrón
+/// Factory + Strategy). Para pasar de la demo al backend real no se toca
+/// ninguna otra clase. También garantiza que haya UNA sola instancia de
+/// cada repositorio y un solo [ApiClient] para toda la app: cumple el rol
+/// de un Singleton sin sus problemas (se puede reemplazar en las pruebas).
 class Dependencias {
   const Dependencias({
     required this.catalogo,
@@ -41,6 +48,8 @@ class Dependencias {
     required this.pago,
     required this.sesion,
     required this.reparto,
+    required this.carrito,
+    required this.ubicacionEntrega,
     this.pistaClaves,
   });
 
@@ -62,11 +71,18 @@ class Dependencias {
       ),
       sesion: SesionRepository(
         service: SesionServiceHttp(api),
-        alCambiarToken: (token) => api.token = token,
+        alCambiarToken: api.usarToken,
       ),
       reparto: RepartoRepository(
         service: RepartoServiceHttp(api),
         ubicacion: const UbicacionServiceGeolocator(),
+      ),
+      carrito: CarritoRepository(
+        service: const CarritoLocalServicePreferencias(),
+      ),
+      ubicacionEntrega: UbicacionEntregaRepository(
+        geocodificacion: GeocodificacionServiceHttp(api),
+        gps: const UbicacionServiceGeolocator(),
       ),
     );
   }
@@ -82,6 +98,8 @@ class Dependencias {
     SesionService? sesionService,
     RepartoService? repartoService,
     UbicacionService? ubicacionService,
+    CarritoLocalService? carritoLocalService,
+    GeocodificacionService? geocodificacionService,
     Duration intervaloPago = const Duration(seconds: 1),
   }) {
     return Dependencias(
@@ -101,14 +119,24 @@ class Dependencias {
         intervaloConsulta: intervaloPago,
       ),
       sesion: SesionRepository(
-        service: sesionService ?? const SesionServiceSimulado(),
+        service: sesionService ?? SesionServiceSimulado(),
       ),
       reparto: RepartoRepository(
         service: repartoService ?? RepartoServiceSimulado(),
         ubicacion: ubicacionService ?? const UbicacionServiceGeolocator(),
       ),
-      pistaClaves: 'Demo: la clave es "${SesionServiceSimulado.claveDueno}" '
-          'o "${SesionServiceSimulado.claveRepartidor}".',
+      carrito: CarritoRepository(
+        service: carritoLocalService ?? const CarritoLocalServicePreferencias(),
+      ),
+      ubicacionEntrega: UbicacionEntregaRepository(
+        geocodificacion:
+            geocodificacionService ?? const GeocodificacionServiceSimulado(),
+        gps: ubicacionService ?? const UbicacionServiceGeolocator(),
+      ),
+      pistaClaves: 'Demo: ${SesionServiceSimulado.emailDueno} o '
+          '${SesionServiceSimulado.emailRepartidor}, contraseña '
+          '"${SesionServiceSimulado.claveInicial}". Si la olvidás, el '
+          'código es ${SesionServiceSimulado.codigoDemo}.',
     );
   }
 
@@ -118,7 +146,9 @@ class Dependencias {
   final PagoRepository pago;
   final SesionRepository sesion;
   final RepartoRepository reparto;
+  final CarritoRepository carrito;
+  final UbicacionEntregaRepository ubicacionEntrega;
 
-  /// Solo en la demo: qué claves se pueden usar para ingresar.
+  /// Solo en la demo: qué cuentas se pueden usar para ingresar.
   final String? pistaClaves;
 }

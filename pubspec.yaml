@@ -20,6 +20,8 @@ dependencies:
   # Cámara y galería para cargar productos con una foto.
   image_picker: ^1.1.2
   geolocator: ^14.1.2
+  # Guarda el carrito en el celular (datos chicos de clave y valor).
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
