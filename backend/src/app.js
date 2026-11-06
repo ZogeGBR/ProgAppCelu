@@ -23,7 +23,11 @@ import {
   procesarWebhook,
 } from './pagos.js';
 import { marcarEntregado, registrarPosicion, seguimientoDe } from './seguimiento.js';
-import { crearLimitadorDeIntentos, crearToken, exigirRol, rolDeClave } from './sesiones.js';
+import { crearCorreo } from './correo.js';
+import { crearGeocodificador } from './geo.js';
+import { confirmarCodigo, solicitarCodigo } from './recuperacion.js';
+import { crearLimitadorDeIntentos, crearToken, exigirRol } from './sesiones.js';
+import { asegurarUsuario, verificarCredenciales } from './usuarios.js';
 
 export function crearApp(config = {}) {
   const {
@@ -33,19 +37,37 @@ export function crearApp(config = {}) {
     geminiApiKey,
     geminiModelo = 'gemini-2.5-flash',
     urlPublica,
-    claveDueno,
-    claveRepartidor,
+    usuariosIniciales = [],
     rutaBd,
+    smtpUrl,
+    remitenteCorreo,
+    googleMapsApiKey,
+    contactoMapas,
+    geocodificacion = 'nominatim',
+    correo: correoInyectado,
     secretoSesion = crypto.randomBytes(32).toString('hex'),
     simularReparto = !mpAccessToken,
   } = config;
 
   abrirBd(rutaBd);
+  for (const usuario of usuariosIniciales) asegurarUsuario(usuario);
+
+  const correo = correoInyectado ?? crearCorreo({ smtpUrl, remitente: remitenteCorreo });
+  const direccionDe = crearGeocodificador({
+    modo: geocodificacion,
+    googleApiKey: googleMapsApiKey,
+    contacto: contactoMapas,
+  });
 
   const clienteMp = crearClienteMercadoPago(mpAccessToken);
   const soloDueno = exigirRol(secretoSesion, 'dueno');
   const soloReparto = exigirRol(secretoSesion, 'repartidor', 'dueno');
   const intentoPermitido = crearLimitadorDeIntentos();
+  const pedidoDeCodigoPermitido = crearLimitadorDeIntentos();
+  const limitar = (permitido) => (req, res, next) =>
+    permitido(req.ip)
+      ? next()
+      : res.status(429).json({ error: 'Demasiados intentos. Esperá un minuto.' });
   const app = express();
   app.use(express.json({ limit: '8mb' }));
 
@@ -59,14 +81,49 @@ export function crearApp(config = {}) {
     });
   });
 
-  // --- Sesiones: el dueño y el repartidor entran con su clave ---
-  app.post('/sesiones', (req, res) => {
-    if (!intentoPermitido(req.ip)) {
-      return res.status(429).json({ error: 'Demasiados intentos. Esperá un minuto.' });
+  // --- Sesiones: el dueño y el repartidor entran con email y contraseña ---
+  app.post('/sesiones', limitar(intentoPermitido), (req, res) => {
+    const usuario = verificarCredenciales(req.body?.email, req.body?.clave);
+    if (!usuario) return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
+    return res.status(201).json({
+      rol: usuario.rol,
+      nombre: usuario.nombre,
+      token: crearToken(usuario.rol, secretoSesion),
+    });
+  });
+
+  // --- Recuperar la contraseña ---
+  // Siempre 202: la respuesta no dice si el email tiene cuenta.
+  app.post('/recuperacion/solicitar', limitar(pedidoDeCodigoPermitido), async (req, res) => {
+    try {
+      await solicitarCodigo({ email: req.body?.email, correo, secreto: secretoSesion });
+    } catch (error) {
+      console.error('No se pudo enviar el código:', error.message);
     }
-    const rol = rolDeClave(req.body?.clave, { claveDueno, claveRepartidor });
-    if (!rol) return res.status(401).json({ error: 'Clave incorrecta.' });
-    return res.status(201).json({ rol, token: crearToken(rol, secretoSesion) });
+    res.status(202).json({ ok: true });
+  });
+
+  app.post('/recuperacion/confirmar', limitar(intentoPermitido), (req, res, next) => {
+    try {
+      confirmarCodigo({
+        email: req.body?.email,
+        codigo: req.body?.codigo,
+        claveNueva: req.body?.claveNueva,
+        secreto: secretoSesion,
+      });
+      res.sendStatus(204);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // --- Mapa: de un punto a "calle y número" ---
+  app.get('/geo/inversa', async (req, res, next) => {
+    try {
+      res.json(await direccionDe(req.query.lat, req.query.lng));
+    } catch (error) {
+      next(error);
+    }
   });
 
   // --- Catálogo ---
