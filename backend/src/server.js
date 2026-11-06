@@ -13,8 +13,27 @@ const app = crearApp({
   geminiApiKey: process.env.GEMINI_API_KEY,
   geminiModelo: process.env.GEMINI_MODELO,
   urlPublica: process.env.URL_PUBLICA,
-  claveDueno: process.env.CLAVE_DUENO,
-  claveRepartidor: process.env.CLAVE_REPARTIDOR,
+  // Las cuentas se crean la primera vez; después la contraseña se cambia
+  // desde la app ("¿Olvidaste tu contraseña?") y el .env ya no manda.
+  usuariosIniciales: [
+    {
+      email: process.env.DUENO_EMAIL,
+      clave: process.env.DUENO_CLAVE,
+      nombre: 'Don Ceferino',
+      rol: 'dueno',
+    },
+    {
+      email: process.env.REPARTIDOR_EMAIL,
+      clave: process.env.REPARTIDOR_CLAVE,
+      nombre: 'Repartidor',
+      rol: 'repartidor',
+    },
+  ],
+  smtpUrl: process.env.SMTP_URL,
+  remitenteCorreo: process.env.CORREO_REMITENTE,
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+  contactoMapas: process.env.CONTACTO_MAPAS,
+  geocodificacion: process.env.GEOCODIFICACION ?? 'nominatim',
   rutaBd: process.env.RUTA_BD ?? 'freshmarket.db',
   secretoSesion: process.env.SECRETO_SESION || undefined,
   // Sin definir, se simula solo si Mercado Pago también está simulado.

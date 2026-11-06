@@ -7,17 +7,23 @@ import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 
 import { crearApp } from '../src/app.js';
-import { abrirBd } from '../src/bd.js';
+import { abrirBd, obtenerBd } from '../src/bd.js';
 import { agregarProducto, buscarProducto } from '../src/catalogo.js';
 import { normalizar } from '../src/ia.js';
 import { firmaValida, traducirEstado } from '../src/pagos.js';
 import { seguimientoDe, TIEMPOS } from '../src/seguimiento.js';
-import { crearToken, rolDeClave, rolDeToken } from '../src/sesiones.js';
+import { crearCorreo } from '../src/correo.js';
+import { armarDireccion } from '../src/geo.js';
+import { MAXIMOS_INTENTOS_CODIGO } from '../src/recuperacion.js';
+import { crearToken, rolDeToken } from '../src/sesiones.js';
 
 let servidor;
 let url;
 let tokenDueno;
 let tokenRepartidor;
+const correo = crearCorreo();
+const DUENO = { email: 'ceferino@freshmarket.test', clave: 'clave-dueno-1' };
+const REPARTIDOR = { email: 'tobias@freshmarket.test', clave: 'clave-reparto-1' };
 
 const pedir = (ruta, opciones = {}) =>
   fetch(`${url}${ruta}`, {
@@ -29,14 +35,21 @@ const pedir = (ruta, opciones = {}) =>
 const conToken = (token) => ({ authorization: `Bearer ${token}` });
 
 before(async () => {
-  servidor = crearApp({ claveDueno: 'clave-dueno', claveRepartidor: 'clave-reparto' }).listen(0);
+  servidor = crearApp({
+    usuariosIniciales: [
+      { ...DUENO, nombre: 'Don Ceferino', rol: 'dueno' },
+      { ...REPARTIDOR, nombre: 'Tobías', rol: 'repartidor' },
+    ],
+    geocodificacion: 'simulado',
+    correo,
+  }).listen(0);
   await new Promise((resolver) => servidor.once('listening', resolver));
   url = `http://localhost:${servidor.address().port}`;
 
-  const ingresar = async (clave) =>
-    (await (await pedir('/sesiones', { method: 'POST', body: { clave } })).json()).token;
-  tokenDueno = await ingresar('clave-dueno');
-  tokenRepartidor = await ingresar('clave-reparto');
+  const ingresar = async (cuenta) =>
+    (await (await pedir('/sesiones', { method: 'POST', body: cuenta })).json()).token;
+  tokenDueno = await ingresar(DUENO);
+  tokenRepartidor = await ingresar(REPARTIDOR);
 });
 
 after(() => servidor.close());
@@ -49,18 +62,36 @@ const pedidoDePrueba = (id, items = [{ productoId: 'p2', cantidad: 2 }]) => ({
 });
 
 describe('sesiones', () => {
-  test('cada clave entra con su rol y una clave mala no entra', async () => {
-    const dueno = await pedir('/sesiones', { method: 'POST', body: { clave: 'clave-dueno' } });
-    assert.equal((await dueno.json()).rol, 'dueno');
+  test('cada cuenta entra con su rol y una contraseña mala no entra', async () => {
+    const dueno = await pedir('/sesiones', { method: 'POST', body: DUENO });
+    const datos = await dueno.json();
+    assert.equal(datos.rol, 'dueno');
+    assert.equal(datos.nombre, 'Don Ceferino');
 
-    const mala = await pedir('/sesiones', { method: 'POST', body: { clave: 'cualquiera' } });
+    // El email no distingue mayúsculas.
+    const mayusculas = await pedir('/sesiones', {
+      method: 'POST',
+      body: { ...REPARTIDOR, email: 'TOBIAS@FreshMarket.test' },
+    });
+    assert.equal((await mayusculas.json()).rol, 'repartidor');
+
+    const mala = await pedir('/sesiones', {
+      method: 'POST',
+      body: { email: DUENO.email, clave: 'otra-cosa' },
+    });
+    const inexistente = await pedir('/sesiones', {
+      method: 'POST',
+      body: { email: 'nadie@x.com', clave: 'lo-que-sea' },
+    });
     assert.equal(mala.status, 401);
+    assert.equal(inexistente.status, 401);
   });
 
-  test('sin clave configurada nadie entra', () => {
-    assert.equal(rolDeClave('cualquiera', {}), null);
-    assert.equal(rolDeClave('', { claveDueno: '' }), null);
-    assert.equal(rolDeClave(undefined, { claveDueno: 'x' }), null);
+  test('la contraseña se guarda como huella, nunca en texto plano', () => {
+    const fila = obtenerBd().prepare('SELECT * FROM usuarios WHERE email = ?').get(DUENO.email);
+    assert.notEqual(fila.clave_hash, DUENO.clave);
+    assert.ok(!fila.clave_hash.includes(DUENO.clave));
+    assert.equal(fila.clave_hash.length, 128);
   });
 
   test('un token vencido o modificado no sirve', () => {
@@ -73,12 +104,120 @@ describe('sesiones', () => {
     assert.equal(rolDeToken(crearToken('dueno', 'secreto', hace2Dias), 'secreto'), null);
   });
 
-  test('frena a quien prueba muchas claves', async () => {
+  test('frena a quien prueba muchas contraseñas', async () => {
     const respuestas = [];
     for (let i = 0; i < 12; i += 1) {
-      respuestas.push((await pedir('/sesiones', { method: 'POST', body: { clave: `x${i}` } })).status);
+      const cuerpo = { email: 'intruso@x.com', clave: `x${i}` };
+      respuestas.push((await pedir('/sesiones', { method: 'POST', body: cuerpo })).status);
     }
     assert.ok(respuestas.includes(429));
+  });
+});
+
+describe('recuperar la contraseña', () => {
+  // El limitador de /sesiones quedó lleno por la prueba anterior: estas
+  // pruebas usan un servidor propio.
+  let otro;
+  let urlOtro;
+  const correoOtro = crearCorreo();
+  const cuenta = { email: 'ceferino@freshmarket.test', clave: 'clave-vieja-1' };
+
+  before(async () => {
+    otro = crearApp({
+      usuariosIniciales: [{ ...cuenta, nombre: 'Don Ceferino', rol: 'dueno' }],
+      geocodificacion: 'simulado',
+      correo: correoOtro,
+    }).listen(0);
+    await new Promise((resolver) => otro.once('listening', resolver));
+    urlOtro = `http://localhost:${otro.address().port}`;
+  });
+
+  after(() => otro.close());
+
+  const enviar = (ruta, body) =>
+    fetch(`${urlOtro}${ruta}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const ultimoCodigo = () => correoOtro.enviados.at(-1).codigo;
+
+  test('responde igual exista o no el email', async () => {
+    const existe = await enviar('/recuperacion/solicitar', { email: cuenta.email });
+    const noExiste = await enviar('/recuperacion/solicitar', { email: 'nadie@x.com' });
+    assert.equal(existe.status, 202);
+    assert.equal(noExiste.status, 202);
+    assert.equal(correoOtro.enviados.at(-1).email, cuenta.email);
+    assert.match(ultimoCodigo(), /^\d{6}$/);
+  });
+
+  test('con el código correcto cambia la contraseña y el código no se reusa', async () => {
+    await enviar('/recuperacion/solicitar', { email: cuenta.email });
+    const codigo = ultimoCodigo();
+    const cambio = { email: cuenta.email, codigo, claveNueva: 'clave-nueva-1' };
+
+    assert.equal((await enviar('/recuperacion/confirmar', cambio)).status, 204);
+    assert.equal((await enviar('/sesiones', { ...cuenta, clave: 'clave-nueva-1' })).status, 201);
+    assert.equal((await enviar('/sesiones', cuenta)).status, 401);
+    assert.equal((await enviar('/recuperacion/confirmar', cambio)).status, 400);
+  });
+
+  test('un código equivocado o una contraseña corta no sirven', async () => {
+    await enviar('/recuperacion/solicitar', { email: cuenta.email });
+    const codigo = ultimoCodigo();
+    const otroCodigo = codigo === '000000' ? '111111' : '000000';
+
+    const malo = await enviar('/recuperacion/confirmar', {
+      email: cuenta.email,
+      codigo: otroCodigo,
+      claveNueva: 'clave-nueva-2',
+    });
+    const corta = await enviar('/recuperacion/confirmar', {
+      email: cuenta.email,
+      codigo,
+      claveNueva: '123',
+    });
+    assert.equal(malo.status, 400);
+    assert.equal(corta.status, 400);
+  });
+
+  test('después de varios intentos fallidos el código se anula', async () => {
+    await enviar('/recuperacion/solicitar', { email: cuenta.email });
+    const codigo = ultimoCodigo();
+    const fila = obtenerBd().prepare('SELECT id FROM recuperaciones_clave ORDER BY id DESC').get();
+    obtenerBd()
+      .prepare('UPDATE recuperaciones_clave SET intentos = ? WHERE id = ?')
+      .run(MAXIMOS_INTENTOS_CODIGO, fila.id);
+
+    const correcto = await enviar('/recuperacion/confirmar', {
+      email: cuenta.email,
+      codigo,
+      claveNueva: 'clave-nueva-3',
+    });
+    // Ni con el código correcto: ya se probaron demasiados.
+    assert.equal(correcto.status, 400);
+  });
+});
+
+describe('mapa: punto -> dirección', () => {
+  test('devuelve la calle y la guarda en la caché', async () => {
+    const respuesta = await pedir('/geo/inversa?lat=-32.885&lng=-68.84');
+    const datos = await respuesta.json();
+    assert.equal(respuesta.status, 200);
+    assert.match(datos.direccion, /^San Martín \d+, Mendoza$/);
+
+    const guardadas = obtenerBd().prepare('SELECT COUNT(*) AS n FROM direcciones_cache').get();
+    assert.ok(guardadas.n >= 1);
+  });
+
+  test('rechaza coordenadas inválidas', async () => {
+    assert.equal((await pedir('/geo/inversa?lat=500&lng=0')).status, 400);
+    assert.equal((await pedir('/geo/inversa')).status, 400);
+  });
+
+  test('arma la dirección con lo que haya', () => {
+    assert.equal(armarDireccion({ calle: 'Belgrano', numero: '55', barrio: 'Centro' }), 'Belgrano 55, Centro');
+    assert.equal(armarDireccion({ calle: 'Belgrano', ciudad: 'Mendoza' }), 'Belgrano, Mendoza');
   });
 });
 

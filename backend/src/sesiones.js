@@ -1,29 +1,15 @@
-// Quién puede hacer qué: el dueño y el repartidor entran con una clave y
-// reciben una sesión firmada. Los clientes compran sin cuenta, a propósito:
-// muchos son personas mayores y un registro sería una traba.
+// Quién puede hacer qué: el dueño y el repartidor entran con su email y su
+// contraseña (ver usuarios.js) y reciben una sesión firmada. Los clientes
+// compran sin cuenta, a propósito: muchos son personas mayores y un registro
+// sería una traba.
 import crypto from 'node:crypto';
 
 const DURACION_SESION = 12 * 60 * 60 * 1000;
 const MAXIMOS_INTENTOS = 10;
 const VENTANA_INTENTOS = 60 * 1000;
 
-const huella = (texto) => crypto.createHash('sha256').update(String(texto)).digest();
-
-// Comparar huellas de igual largo evita filtrar datos por el tiempo de respuesta.
-function clavesIguales(a, b) {
-  return crypto.timingSafeEqual(huella(a), huella(b));
-}
-
 function firmar(contenido, secreto) {
   return crypto.createHmac('sha256', secreto).update(contenido).digest('base64url');
-}
-
-/** Devuelve el rol de esa clave, o null. Sin clave configurada, nadie entra. */
-export function rolDeClave(clave, { claveDueno, claveRepartidor }) {
-  if (!clave) return null;
-  if (claveDueno && clavesIguales(clave, claveDueno)) return 'dueno';
-  if (claveRepartidor && clavesIguales(clave, claveRepartidor)) return 'repartidor';
-  return null;
 }
 
 export function crearToken(rol, secreto, ahora = Date.now()) {
