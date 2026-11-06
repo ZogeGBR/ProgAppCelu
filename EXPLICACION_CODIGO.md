@@ -8,7 +8,15 @@ Guía archivo por archivo del proyecto. Explica qué hace cada archivo, cómo se
 > siguen valiendo; lo que cambió de lugar es esto:
 >
 > | V2 | V3 |
-> |---|---|
+> |> **Versión 4.** Se sumaron: `ui/core/widgets/campo_clave.dart` (el ojo),
+> `ui/sesion/` con la recuperación de contraseña, `ui/pago/` con
+> `ElegirUbicacionViewModel` (tocar el mapa → dirección),
+> `data/services/geocodificacion_service.dart`,
+> `data/services/carrito_local_service.dart`, sus repositorios y
+> `backend/sql/`. Cada clase en su capa: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+> Patrones usados y no usados: [`INFORME_TEORIA_Y_PATRONES.md`](INFORME_TEORIA_Y_PATRONES.md).
+
+---|---|
 > | `models/*.dart` | `domain/models/*.dart` (sin `IconData`: los íconos y textos pasaron a `ui/.../*_ui.dart`) |
 > | `providers/carrito_provider.dart` | `ui/carrito/view_models/carrito_view_model.dart` (`confirmarPedido` se separó en `armarPedido` + `vaciarCarrito`) |
 > | `screens/home_screen.dart` | `ui/catalogo/widgets/catalogo_screen.dart` + `CatalogoViewModel` |
