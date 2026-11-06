@@ -1,0 +1,158 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
+import '../../../data/repositories/pago_repository.dart';
+import '../../../domain/models/metodo_pago.dart';
+import '../../../domain/models/pedido.dart';
+import '../../../domain/models/posicion.dart';
+import '../../../domain/models/resultado_pago.dart';
+
+/// Pasos de la pantalla de pago.
+enum PasoPago {
+  eligiendo,
+  abriendoMercadoPago,
+  esperandoConfirmacion,
+  aprobado,
+  rechazado,
+  sinConfirmar,
+  error,
+}
+
+/// Estado de la pantalla de pago.
+///
+/// No conoce al carrito ni al seguimiento: recibe dos callbacks
+/// (patrón de callbacks) para armar el pedido y para avisar que se
+/// aprobó. Quien crea la pantalla decide qué hacer en cada caso.
+class PagoViewModel extends ChangeNotifier {
+  PagoViewModel({
+    required PagoRepository repositorio,
+    required Pedido Function(MetodoPago metodo) armarPedido,
+    required void Function(Pedido pedido) alAprobar,
+  })  : _repositorio = repositorio,
+        _armarPedido = armarPedido,
+        _alAprobar = alAprobar;
+
+  final PagoRepository _repositorio;
+  final Pedido Function(MetodoPago metodo) _armarPedido;
+  final void Function(Pedido pedido) _alAprobar;
+
+  MetodoPago? _metodo;
+  String _direccion = '';
+  Posicion? _destino;
+  PasoPago _paso = PasoPago.eligiendo;
+  Pedido? _pedido;
+  StreamSubscription<ResultadoPago>? _suscripcion;
+  bool _descartado = false;
+
+  MetodoPago? get metodoElegido => _metodo;
+  String get direccion => _direccion;
+  Posicion? get destino => _destino;
+  bool get faltaDireccion => _direccion.trim().isEmpty;
+  bool get esEfectivo => _metodo == MetodoPago.efectivo;
+  PasoPago get paso => _paso;
+  Pedido? get pedido => _pedido;
+
+  bool get puedePagar =>
+      _metodo != null && !faltaDireccion && _paso == PasoPago.eligiendo;
+
+  bool get estaOcupado =>
+      _paso == PasoPago.abriendoMercadoPago ||
+      _paso == PasoPago.esperandoConfirmacion;
+
+  void elegirMetodo(MetodoPago metodo) {
+    if (estaOcupado) return;
+    _metodo = metodo;
+    notifyListeners();
+  }
+
+  void cambiarDireccion(String direccion) {
+    _direccion = direccion;
+    notifyListeners();
+  }
+
+  /// El punto que se marcó en el mapa. Si el mapa encontró la calle, se
+  /// completa sola la dirección (la persona la puede corregir después).
+  void marcarDestino(Posicion destino, {String direccion = ''}) {
+    _destino = destino;
+    if (direccion.trim().isNotEmpty) _direccion = direccion.trim();
+    notifyListeners();
+  }
+
+  Future<void> pagar() async {
+    final metodo = _metodo;
+    if (metodo == null || !puedePagar) return;
+
+    final armado = _armarPedido(metodo).copiarCon(
+      direccion: _direccion.trim(),
+      destino: _destino,
+    );
+    _pedido = armado;
+    _cambiarPaso(PasoPago.abriendoMercadoPago);
+
+    final Pedido pedido;
+    try {
+      pedido = await _repositorio.iniciarPago(armado);
+    } on Exception {
+      _cambiarPaso(PasoPago.error);
+      return;
+    }
+    if (_descartado) return;
+    _pedido = pedido;
+
+    // En efectivo no hay nada que confirmar: se paga al recibir.
+    if (metodo == MetodoPago.efectivo) {
+      _alAprobar(pedido);
+      _cambiarPaso(PasoPago.aprobado);
+      return;
+    }
+
+    _cambiarPaso(PasoPago.esperandoConfirmacion);
+    _suscripcion = _repositorio.seguirEstado(pedido.id).listen(
+          _alRecibirResultado,
+          // Una consulta que falla no define nada: se sigue esperando.
+          onError: (Object _) {},
+          onDone: _alTerminarEspera,
+        );
+  }
+
+  /// La persona volvió sin pagar o quiere elegir otro medio.
+  void volverAElegir() {
+    _cancelarEspera();
+    _cambiarPaso(PasoPago.eligiendo);
+  }
+
+  void _alRecibirResultado(ResultadoPago resultado) {
+    if (resultado == ResultadoPago.pendiente) return;
+    _cancelarEspera();
+    if (resultado == ResultadoPago.aprobado) {
+      _alAprobar(_pedido!);
+      _cambiarPaso(PasoPago.aprobado);
+    } else {
+      _cambiarPaso(PasoPago.rechazado);
+    }
+  }
+
+  void _alTerminarEspera() {
+    if (_paso == PasoPago.esperandoConfirmacion) {
+      _cambiarPaso(PasoPago.sinConfirmar);
+    }
+  }
+
+  void _cambiarPaso(PasoPago paso) {
+    _paso = paso;
+    if (!_descartado) notifyListeners();
+  }
+
+  void _cancelarEspera() {
+    unawaited(_suscripcion?.cancel());
+    _suscripcion = null;
+  }
+
+  @override
+  void dispose() {
+    _descartado = true;
+    _cancelarEspera();
+    super.dispose();
+  }
+}
