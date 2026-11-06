@@ -71,8 +71,11 @@ class PagoViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void marcarDestino(Posicion destino) {
+  /// El punto que se marcó en el mapa. Si el mapa encontró la calle, se
+  /// completa sola la dirección (la persona la puede corregir después).
+  void marcarDestino(Posicion destino, {String direccion = ''}) {
     _destino = destino;
+    if (direccion.trim().isNotEmpty) _direccion = direccion.trim();
     notifyListeners();
   }
 

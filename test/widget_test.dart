@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/config/dependencias.dart';
+import 'package:freshmarket_app/data/services/carrito_local_service.dart';
+import 'package:freshmarket_app/data/services/sesion_service.dart';
 import 'package:freshmarket_app/main.dart';
 
 import 'fakes.dart';
@@ -15,6 +17,9 @@ void main() {
       seguimientoService: seguimiento,
       camara: CamaraFalsa(),
       pagoService: PagoServiceFalso(),
+      carritoLocalService: CarritoLocalServiceMemoria(),
+      geocodificacionService: GeocodificacionFalsa(),
+      ubicacionService: UbicacionFalsa(),
     );
     await tester.pumpWidget(FreshMarketApp(dependencias: dependencias));
     await tester.pumpAndSettle();
@@ -114,14 +119,31 @@ void main() {
     expect(find.textContaining('Ver mi carrito'), findsNothing);
   });
 
-  group('ingreso con clave', () {
-    Future<void> ingresarCon(WidgetTester tester, String clave) async {
+  group('ingreso con email y contraseña', () {
+    const emailDueno = SesionServiceSimulado.emailDueno;
+    const claveDemo = SesionServiceSimulado.claveInicial;
+
+    Finder campo(String etiqueta) => find.widgetWithText(TextField, etiqueta);
+
+    Future<void> abrirIngreso(WidgetTester tester) async {
       await tester.tap(find.byTooltip('Soy del almacén'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), clave);
+    }
+
+    Future<void> ingresarCon(
+      WidgetTester tester,
+      String email,
+      String clave,
+    ) async {
+      await abrirIngreso(tester);
+      await tester.enterText(campo('Email'), email);
+      await tester.enterText(campo('Contraseña'), clave);
       await tester.tap(find.text('Ingresar'));
       await tester.pumpAndSettle();
     }
+
+    bool claveOculta(WidgetTester tester) =>
+        tester.widget<TextField>(campo('Contraseña')).obscureText;
 
     testWidgets('un cliente no ve las secciones del almacén', (tester) async {
       await abrirApp(tester);
@@ -130,19 +152,39 @@ void main() {
       expect(find.text('Repartir'), findsNothing);
     });
 
-    testWidgets('una clave mala no entra y avisa', (tester) async {
+    testWidgets('el ojo muestra y oculta la contraseña', (tester) async {
+      await abrirApp(tester);
+      await abrirIngreso(tester);
+      await tester.enterText(campo('Contraseña'), 'secreta');
+
+      expect(claveOculta(tester), isTrue);
+
+      await tester.tap(find.byTooltip('Mostrar contraseña'));
+      await tester.pump();
+      expect(claveOculta(tester), isFalse);
+      expect(find.text('secreta'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Ocultar contraseña'));
+      await tester.pump();
+      expect(claveOculta(tester), isTrue);
+    });
+
+    testWidgets('una contraseña mala no entra y avisa', (tester) async {
       await abrirApp(tester);
 
-      await ingresarCon(tester, 'cualquiera');
+      await ingresarCon(tester, emailDueno, 'cualquiera');
 
-      expect(find.text('Esa clave no es correcta.'), findsOneWidget);
+      expect(
+        find.text('El email o la contraseña no son correctos.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('el dueño ve "Mi almacén" y al salir desaparece',
         (tester) async {
       await abrirApp(tester);
 
-      await ingresarCon(tester, 'dueno');
+      await ingresarCon(tester, emailDueno, claveDemo);
       expect(find.text('Cargar producto con una foto'), findsOneWidget);
 
       await tester.tap(find.text('Salir'));
@@ -154,9 +196,53 @@ void main() {
     testWidgets('el repartidor ve sus pedidos', (tester) async {
       await abrirApp(tester);
 
-      await ingresarCon(tester, 'repartidor');
+      await ingresarCon(tester, SesionServiceSimulado.emailRepartidor, claveDemo);
 
       expect(find.text('Salir a repartir'), findsOneWidget);
+    });
+
+    testWidgets('recuperar la contraseña y entrar con la nueva',
+        (tester) async {
+      await abrirApp(tester);
+      await abrirIngreso(tester);
+      await tester.enterText(campo('Email'), emailDueno);
+
+      await tester.tap(find.text('¿Olvidaste tu contraseña?'));
+      await tester.pumpAndSettle();
+      // El email ya escrito pasa solo a la pantalla de recuperación.
+      expect(find.text(emailDueno), findsOneWidget);
+
+      await tester.tap(find.text('Mandarme el código'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        campo('Código'),
+        SesionServiceSimulado.codigoDemo,
+      );
+      await tester.enterText(campo('Contraseña nueva'), 'clave-nueva-1');
+      await tester.enterText(
+        campo('Repetí la contraseña nueva'),
+        'clave-nueva-1',
+      );
+      await tester.ensureVisible(find.text('Guardar contraseña nueva'));
+      await tester.tap(find.text('Guardar contraseña nueva'));
+      await tester.pumpAndSettle();
+      expect(find.text('¡Listo! Tu contraseña cambió.'), findsOneWidget);
+
+      await tester.tap(find.text('Volver a ingresar'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Listo. Ya podés ingresar con tu contraseña nueva.'),
+        findsOneWidget,
+      );
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+          .hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+      await tester.enterText(campo('Contraseña'), 'clave-nueva-1');
+      await tester.tap(find.text('Ingresar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cargar producto con una foto'), findsOneWidget);
     });
   });
 }

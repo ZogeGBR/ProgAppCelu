@@ -29,40 +29,48 @@ void main() {
     expect(viewModel.esRepartidor, isFalse);
   });
 
-  test('cada clave entra con su rol y guarda el token', () async {
-    await viewModel.ingresar('clave-dueno');
+  test('cada cuenta entra con su rol, su nombre y guarda el token', () async {
+    await viewModel.ingresar('ceferino@x.com', 'clave-dueno');
     expect(viewModel.rol, Rol.dueno);
+    expect(viewModel.nombre, 'Don Ceferino');
     expect(token, 'token-dueno');
 
-    await viewModel.ingresar('  clave-reparto ');
+    await viewModel.ingresar('  tobias@x.com ', 'clave-reparto');
     expect(viewModel.rol, Rol.repartidor);
     expect(token, 'token-reparto');
   });
 
-  test('una clave mala no entra', () async {
-    await viewModel.ingresar('cualquiera');
+  test('una contraseña mala no entra', () async {
+    await viewModel.ingresar('ceferino@x.com', 'cualquiera');
 
     expect(viewModel.haySesion, isFalse);
-    expect(viewModel.estado, EstadoIngreso.claveIncorrecta);
+    expect(viewModel.estado, EstadoIngreso.datosIncorrectos);
     expect(token, isNull);
   });
 
-  test('sin internet no dice que la clave está mal', () async {
+  test('la contraseña no se recorta: un espacio es parte de ella', () async {
+    await viewModel.ingresar('ceferino@x.com', ' clave-dueno ');
+
+    expect(viewModel.estado, EstadoIngreso.datosIncorrectos);
+  });
+
+  test('sin internet no dice que los datos están mal', () async {
     service.sinConexion = true;
 
-    await viewModel.ingresar('clave-dueno');
+    await viewModel.ingresar('ceferino@x.com', 'clave-dueno');
 
     expect(viewModel.estado, EstadoIngreso.sinConexion);
   });
 
-  test('una clave vacía ni se intenta', () async {
-    await viewModel.ingresar('   ');
+  test('con el email o la contraseña vacíos ni se intenta', () async {
+    await viewModel.ingresar('   ', 'clave-dueno');
+    await viewModel.ingresar('ceferino@x.com', '');
 
     expect(viewModel.estado, EstadoIngreso.esperando);
   });
 
   test('salir borra la sesión y el token', () async {
-    await viewModel.ingresar('clave-dueno');
+    await viewModel.ingresar('ceferino@x.com', 'clave-dueno');
 
     viewModel.salir();
 

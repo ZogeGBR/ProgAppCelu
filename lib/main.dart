@@ -39,12 +39,15 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
   late final AlmacenViewModel _almacen;
   late final RepartoViewModel _reparto;
 
+  // Eventos del sistema: avisa cuando la app pasa a segundo plano.
+  late final AppLifecycleListener _cicloDeVida;
+
   @override
   void initState() {
     super.initState();
     final dependencias = widget.dependencias;
     _navegacion = NavegacionViewModel();
-    _carrito = CarritoViewModel();
+    _carrito = CarritoViewModel(repositorio: dependencias.carrito);
     _catalogo = CatalogoViewModel(repositorio: dependencias.catalogo);
     _seguimiento = SeguimientoViewModel(repositorio: dependencias.seguimiento);
     _sesion = SesionViewModel(repositorio: dependencias.sesion);
@@ -62,10 +65,21 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
       },
     );
     unawaited(_catalogo.cargar());
+    unawaited(_carrito.restaurar());
+
+    // Cuando la persona sale de la app (o atiende una llamada), el sistema
+    // puede cerrarla sin avisar: es el último momento seguro para guardar.
+    _cicloDeVida = AppLifecycleListener(
+      onHide: _guardarCarrito,
+      onPause: _guardarCarrito,
+    );
   }
+
+  void _guardarCarrito() => unawaited(_carrito.guardar());
 
   @override
   void dispose() {
+    _cicloDeVida.dispose();
     _navegacion.dispose();
     _carrito.dispose();
     _catalogo.dispose();
@@ -93,6 +107,8 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
         almacen: _almacen,
         reparto: _reparto,
         pagoRepositorio: widget.dependencias.pago,
+        sesionRepositorio: widget.dependencias.sesion,
+        ubicacionEntregaRepositorio: widget.dependencias.ubicacionEntrega,
         pistaClaves: widget.dependencias.pistaClaves,
       ),
     );

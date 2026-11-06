@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../data/repositories/pago_repository.dart';
+import '../../../data/repositories/sesion_repository.dart';
+import '../../../data/repositories/ubicacion_entrega_repository.dart';
 import '../../almacen/view_models/almacen_view_model.dart';
 import '../../almacen/widgets/almacen_screen.dart';
 import '../../carrito/view_models/carrito_view_model.dart';
@@ -11,12 +13,14 @@ import '../../catalogo/view_models/catalogo_view_model.dart';
 import '../../catalogo/widgets/catalogo_screen.dart';
 import '../../escaner/view_models/escaner_view_model.dart';
 import '../../escaner/widgets/escaner_screen.dart';
+import '../../pago/view_models/elegir_ubicacion_view_model.dart';
 import '../../pago/view_models/pago_view_model.dart';
 import '../../pago/widgets/pago_screen.dart';
 import '../../reparto/view_models/reparto_view_model.dart';
 import '../../reparto/widgets/reparto_screen.dart';
 import '../../seguimiento/view_models/seguimiento_view_model.dart';
 import '../../seguimiento/widgets/seguimiento_screen.dart';
+import '../../sesion/view_models/recuperar_clave_view_model.dart';
 import '../../sesion/view_models/sesion_view_model.dart';
 import '../../sesion/widgets/ingresar_screen.dart';
 import '../view_models/navegacion_view_model.dart';
@@ -39,6 +43,8 @@ class InicioScreen extends StatelessWidget {
     required this.almacen,
     required this.reparto,
     required this.pagoRepositorio,
+    required this.sesionRepositorio,
+    required this.ubicacionEntregaRepositorio,
     this.pistaClaves,
   });
 
@@ -51,6 +57,8 @@ class InicioScreen extends StatelessWidget {
   final AlmacenViewModel almacen;
   final RepartoViewModel reparto;
   final PagoRepository pagoRepositorio;
+  final SesionRepository sesionRepositorio;
+  final UbicacionEntregaRepository ubicacionEntregaRepositorio;
   final String? pistaClaves;
 
   List<Seccion> get _secciones => [
@@ -65,6 +73,10 @@ class InicioScreen extends StatelessWidget {
     final pantalla = IngresarScreen(
       viewModel: sesion,
       pista: pistaClaves,
+      crearRecuperacion: (email) => RecuperarClaveViewModel(
+        repositorio: sesionRepositorio,
+        email: email,
+      ),
       alIngresar: _alIngresar,
     );
     Navigator.of(context)
@@ -106,6 +118,11 @@ class InicioScreen extends StatelessWidget {
       items: carrito.items,
       total: carrito.total,
       alVerPedido: () => navegacion.irA(Seccion.miPedido),
+      crearElegirUbicacion: (inicial, direccion) => ElegirUbicacionViewModel(
+        repositorio: ubicacionEntregaRepositorio,
+        inicial: inicial,
+        direccionInicial: direccion,
+      ),
     );
     Navigator.of(context)
         .push(MaterialPageRoute<void>(builder: (_) => pantalla));

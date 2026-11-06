@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/reparto_repository.dart';
-import '../../../data/services/ubicacion_service.dart';
 import '../../../domain/models/pedido_reparto.dart';
+import '../../../domain/models/permiso_ubicacion.dart';
 import '../../../domain/models/posicion.dart';
 
 enum PasoReparto {

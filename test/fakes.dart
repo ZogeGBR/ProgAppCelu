@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:freshmarket_app/data/services/camara_service.dart';
 import 'package:freshmarket_app/data/services/catalogo_service.dart';
 import 'package:freshmarket_app/data/services/etiquetado_service.dart';
+import 'package:freshmarket_app/data/services/geocodificacion_service.dart';
 import 'package:freshmarket_app/data/services/api_client.dart';
 import 'package:freshmarket_app/data/services/pago_service.dart';
 import 'package:freshmarket_app/data/services/reparto_service.dart';
@@ -84,17 +85,44 @@ class CatalogoServiceFalso implements CatalogoService {
   }
 }
 
+/// Dos cuentas: ceferino@x.com / clave-dueno y tobias@x.com / clave-reparto.
+/// El código de recuperación correcto es 123456.
 class SesionServiceFalso implements SesionService {
   bool sinConexion = false;
+  final codigosPedidos = <String>[];
+  final claves = <String, String>{
+    'ceferino@x.com': 'clave-dueno',
+    'tobias@x.com': 'clave-reparto',
+  };
 
   @override
-  Future<Map<String, dynamic>> ingresar(String clave) async {
+  Future<Map<String, dynamic>> ingresar(String email, String clave) async {
     if (sinConexion) throw Exception('sin conexión');
-    return switch (clave) {
-      'clave-dueno' => {'rol': 'dueno', 'token': 'token-dueno'},
-      'clave-reparto' => {'rol': 'repartidor', 'token': 'token-reparto'},
-      _ => throw const ApiException(401, 'Clave incorrecta.'),
-    };
+    if (claves[email] != clave) {
+      throw const ApiException(401, 'Email o contraseña incorrectos.');
+    }
+    return email == 'ceferino@x.com'
+        ? {'rol': 'dueno', 'token': 'token-dueno', 'nombre': 'Don Ceferino'}
+        : {'rol': 'repartidor', 'token': 'token-reparto', 'nombre': 'Tobías'};
+  }
+
+  @override
+  Future<void> solicitarCodigo(String email) async {
+    if (sinConexion) throw Exception('sin conexión');
+    codigosPedidos.add(email);
+  }
+
+  @override
+  Future<void> confirmarCodigo({
+    required String email,
+    required String codigo,
+    required String claveNueva,
+  }) async {
+    if (sinConexion) throw Exception('sin conexión');
+    if (codigo != '123456' || !claves.containsKey(email)) {
+      throw const ApiException(400, 'El código no es correcto.');
+    }
+    claves[email] = claveNueva;
   }
 }
 
@@ -139,6 +167,7 @@ class UbicacionFalsa implements UbicacionService {
   UbicacionFalsa({this.permiso = PermisoUbicacion.concedido});
 
   PermisoUbicacion permiso;
+  Posicion? actual = const Posicion(latitud: -32.89, longitud: -68.84);
   final _controlador = StreamController<Posicion>.broadcast();
 
   void mover(Posicion posicion) => _controlador.add(posicion);
@@ -149,7 +178,32 @@ class UbicacionFalsa implements UbicacionService {
   Future<PermisoUbicacion> pedirPermiso() async => permiso;
 
   @override
+  Future<Posicion?> posicionActual() async =>
+      permiso == PermisoUbicacion.concedido ? actual : null;
+
+  @override
   Stream<Posicion> seguir() => _controlador.stream;
+}
+
+/// Responde "Calle <lat>" y cuenta cuántas veces le preguntaron. Con
+/// [demoras] se puede hacer que una respuesta llegue más tarde que otra.
+class GeocodificacionFalsa implements GeocodificacionService {
+  int consultas = 0;
+  bool falla = false;
+  String? direccionFija;
+  final demoras = <double, Duration>{};
+
+  @override
+  Future<Map<String, dynamic>> direccionDe(
+    double latitud,
+    double longitud,
+  ) async {
+    consultas++;
+    final demora = demoras[latitud];
+    if (demora != null) await Future<void>.delayed(demora);
+    if (falla) throw Exception('sin conexión');
+    return {'direccion': direccionFija ?? 'Calle $latitud'};
+  }
 }
 
 /// Las pruebas deciden cuándo llega cada novedad del reparto.

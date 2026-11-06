@@ -19,10 +19,15 @@ class ApiClient {
   final http.Client _cliente;
 
   /// La sesión del dueño o del repartidor. Los clientes no tienen.
-  String? token;
+  /// Es privada: solo el repositorio de sesión la cambia, con [usarToken].
+  String? _token;
+
+  bool get tieneSesion => _token != null;
+
+  void usarToken(String? token) => _token = token;
 
   Map<String, String> get _encabezados {
-    final token = this.token;
+    final token = _token;
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
