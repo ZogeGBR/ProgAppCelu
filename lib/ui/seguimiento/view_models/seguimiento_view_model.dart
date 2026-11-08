@@ -31,6 +31,7 @@ class SeguimientoViewModel extends ChangeNotifier {
   SeguimientoPedido? _seguimiento;
   StreamSubscription<SeguimientoPedido>? _suscripcion;
   bool _sinConexion = false;
+  bool _descartado = false;
 
   Pedido? get pedido => _pedido;
   bool get hayPedido => _pedido != null;
@@ -46,8 +47,26 @@ class SeguimientoViewModel extends ChangeNotifier {
   bool get mostrarMapa =>
       estado == EstadoPedido.enCamino && posicionRepartidor != null;
 
-  /// Empieza a seguir un pedido recién pagado.
+  /// Retoma el pedido que se estaba siguiendo antes de cerrar la app (se
+  /// llama al abrirla). Si ya se está siguiendo otro, no lo pisa.
+  Future<void> restaurar() async {
+    final Pedido? guardado;
+    try {
+      guardado = await _repositorio.pedidoGuardado();
+    } on Exception {
+      return; // Sin pedido guardado: "Mi pedido" arranca vacío.
+    }
+    if (guardado == null || _pedido != null || _descartado) return;
+    _empezar(guardado);
+  }
+
+  /// Empieza a seguir un pedido recién pagado y lo guarda en el celular.
   void seguir(Pedido pedido) {
+    _empezar(pedido);
+    _sinFrenar(_repositorio.recordar(pedido));
+  }
+
+  void _empezar(Pedido pedido) {
     _cancelarSuscripcion();
     _pedido = pedido;
     _seguimiento = const SeguimientoPedido(estado: EstadoPedido.recibido);
@@ -63,7 +82,13 @@ class SeguimientoViewModel extends ChangeNotifier {
     _cancelarSuscripcion();
     _pedido = null;
     _seguimiento = null;
+    _sinFrenar(_repositorio.olvidar());
     notifyListeners();
+  }
+
+  // Guardar en el celular nunca frena ni rompe el seguimiento.
+  void _sinFrenar(Future<void> tarea) {
+    unawaited(tarea.catchError((Object _) {}));
   }
 
   void _alRecibirNovedad(SeguimientoPedido novedad) {
@@ -87,6 +112,7 @@ class SeguimientoViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _descartado = true;
     unawaited(_suscripcionPagos?.cancel());
     _cancelarSuscripcion();
     super.dispose();

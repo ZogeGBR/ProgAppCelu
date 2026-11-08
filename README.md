@@ -97,7 +97,7 @@ sola al arrancar, o a mano con `cd backend && npm run bd:crear`.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 122 pruebas (ViewModels con fakes, Observer, avisos y pantallas)
+flutter test           # app: 128 pruebas (ViewModels con fakes, Observer, avisos y pantallas)
 cd backend && npm test # backend: 44 pruebas (34 + 10 de notificaciones)
 node scripts/carga.mjs 500   # (desde backend/) prueba de carga
 ```

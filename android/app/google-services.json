@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "892711014615",
+    "project_id": "freshmarket-itu-2026",
+    "storage_bucket": "freshmarket-itu-2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892711014615:android:20ceb3aaacc896f0e86092",
+        "android_client_info": {
+          "package_name": "com.freshmarket.freshmarket_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAriKgzpEL6Y-sx2MUm5MHTtU5iJM38EmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

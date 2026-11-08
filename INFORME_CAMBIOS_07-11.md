@@ -18,7 +18,7 @@ que se corrigió al revisar el código y cómo se comprobó que todo anda.
 | **Usar y entender mejor los patrones** | Guía para el oral con cada patrón explicado sobre el código, recorridos completos y preguntas probables. Informe de teoría actualizado | `docs/GUIA_PATRONES.md`, `INFORME_TEORIA_Y_PATRONES.md` |
 | **Notificaciones push con FCM** | Avisos "Nuevo pedido" (al almacén), "Tu pedido está en camino" y "Tu pedido llegó" (al cliente), con la app abierta, en segundo plano o cerrada. Al tocarlos se abre la sección. Funciona también en la demo sin backend | Sección 3, `docs/NOTIFICACIONES.md` |
 | **Pasar la app a un celular** (para la EGI) | APK de release que compila, configuración de Android para red local y notificaciones, y guía paso a paso con lo que hay que probar en el celular | Sección 4, `docs/CELULAR_REAL.md` |
-| **Repasar bien el código** | Revisión completa: se corrieron todas las pruebas de Zoe, se encontraron y corrigieron problemas, y se sumaron 32 pruebas en la app y 10 en el backend | Secciones 5 y 6 |
+| **Repasar bien el código** | Revisión completa: se corrieron todas las pruebas de Zoe, se encontraron y corrigieron problemas, y se sumaron 38 pruebas en la app y 10 en el backend | Secciones 5 y 6 |
 
 ## 2. Observer en todo el código
 
@@ -142,12 +142,14 @@ celular igual que los reales.
 se niega, "Mi pedido" muestra "Activá las notificaciones" con un botón,
 explicando para qué sirve.
 
-### Lo que falta configurar (una vez)
+### Proyecto de Firebase
 
-Crear el proyecto en la consola de Firebase, bajar `google-services.json`
-y la clave del servidor. Son 10 minutos y está paso a paso en
-`docs/NOTIFICACIONES.md`, sección 4. **No se hizo todavía** porque necesita
-la cuenta de Google de alguien del grupo.
+Creado el 07-11 con la cuenta de Ignacio: **`freshmarket-itu-2026`**, app
+Android `com.freshmarket.freshmarket_app`. `android/app/google-services.json`
+está en el repo (no es secreto: así cualquiera del grupo compila con push).
+La **clave del servidor** (`backend/firebase-credenciales.json`) **no** se
+sube: hay que pedírsela a Ignacio o generar otra desde la consola
+(`docs/NOTIFICACIONES.md`, sección 4).
 
 ## 4. La app en un celular real
 
@@ -180,6 +182,7 @@ faltaría para Play Store: `docs/CELULAR_REAL.md`.
 | 9 | **Encontrado al probar en el emulador:** al tocar la notificación con la pantalla de pago abierta, la sección cambiaba "por debajo" y seguía viéndose el pago | La persona tocaba el aviso y no pasaba nada visible | `NavegacionViewModel.abiertasPorAviso` avisa y `main.dart` cierra las pantallas de encima (salvo un pago en curso, que tiene `PopScope`). Prueba de pantalla incluida y verificado de nuevo en el emulador |
 | 10 | Con backend real pero sin Firebase, la app anotaba en la base un token falso de demo | Datos basura en la tabla `dispositivos` | Sin Firebase el token es `null` y no se anota nada |
 | 11 | El APK no compilaba: `flutter_local_notifications` 23 exige compilar contra Android 37 y `androidx.core` 1.19 exige el plugin de Android 9.1 | Sin APK no hay prueba en celular | Android Gradle Plugin 9.0.1 → **9.1.0**, Gradle 9.1.0 → **9.3.1**, `compileSdk` ≥ 37 (el SDK 37 ya estaba instalado). `minSdk` no cambió: la app se sigue pudiendo instalar en los mismos celulares |
+| 12 | **Encontrado con el push real:** con la app cerrada, al tocar "Tu pedido está en camino" se abría "Mi pedido" **vacío**: el pedido que se seguía vivía solo en memoria | El aviso decía "Seguilo en el mapa" y no había nada que seguir. Y cualquier cliente que cerrara la app perdía el seguimiento | El pedido en curso se guarda en el celular (`PedidoLocalService` con `shared_preferences`, como el carrito). `SeguimientoViewModel.restaurar()` lo retoma al abrir la app; "Hacer otro pedido" lo borra. 6 pruebas nuevas y verificado de nuevo con el push real |
 
 **Revisado sin problemas:** recuperación de contraseña (huella HMAC,
 `timingSafeEqual`, vencimiento, intentos, un solo uso, transacción),
@@ -197,7 +200,7 @@ baja para el alcance del TP.
 
 | Conjunto | Antes | Ahora | Resultado (07-11, PC de Ignacio) |
 |---|---|---|---|
-| App (`flutter test`) | 90 | **122** | **122/122 pasan** |
+| App (`flutter test`) | 90 | **128** | **128/128 pasan** |
 | Backend (`cd backend && npm test`) | 34 | **44** | **44/44 pasan** |
 | `flutter analyze` | — | — | **Sin problemas** |
 | `dart format lib test` | 5 archivos sin formato | — | Todo formateado |
@@ -229,6 +232,10 @@ Pruebas nuevas:
   Firebase falla (token vencido se borra; un error no rompe el pedido).
 - `test/widget_test.dart` (+2): un aviso con la app abierta se muestra en la
   barra; tocar el aviso desde el pago cierra el pago y abre "Mi pedido".
+- `test/pedido_guardado_test.dart` (6): el pedido va al disco y vuelve
+  igual; al cerrar y abrir la app se sigue el mismo pedido y se vuelve a
+  escuchar al repartidor; "Hacer otro pedido" lo borra; no pisa un pedido
+  en curso; lo guardado roto se descarta; sin disco no hace nada.
 - Se adaptaron las pruebas que usaban los callbacks viejos (`almacen`,
   `escaner`, `pago`, `sesion`, `carrito_guardado`) para que verifiquen lo
   mismo observando al repositorio.
@@ -247,8 +254,26 @@ Pruebas nuevas:
 5. Tocar la notificación → se abre la app en **"Mi pedido"** (acá apareció el
    problema 9, que se corrigió y se volvió a probar).
 
-Sin probar todavía: el push **real** de Firebase (falta crear el proyecto,
-sección 3) y un celular físico.
+**Prueba con el push real de Firebase** (backend en la PC con la clave de
+Firebase, app compilada con `URL_BACKEND=http://10.0.2.2:3000`):
+
+1. Al abrir, la app inicia Firebase (`FirebaseApp initialization successful`)
+   y pide el token.
+2. Ingreso como dueño → la barra pasa sola a "Mi almacén" y el backend
+   guarda el token (142 caracteres) con rol `dueno` en `dispositivos`.
+3. Con la app en segundo plano, otro cliente pide en efectivo → llega
+   **"Nuevo pedido #1001 · $7.600 · Belgrano 55"**. Al tocarlo, abre "Mi
+   almacén".
+4. "Salir" → el celular se da de baja (la tabla queda vacía).
+5. Como cliente: pedido en efectivo → el celular se anota para ese pedido.
+6. Con la **app cerrada** (sin proceso), el repartidor manda su primera
+   posición → llega **"Tu pedido #1003 está en camino"**. Al tocarlo, la app
+   arranca desde cero y abre "Mi pedido" **con el pedido y la bici en el
+   mapa** (acá apareció el problema 12, que se corrigió y se volvió a probar).
+7. El repartidor marca entregado → **"Tu pedido #1003 llegó"** reemplaza al
+   aviso anterior.
+
+Sin probar todavía: un celular físico.
 
 Comandos para repetirlo:
 
@@ -264,7 +289,8 @@ cd backend && npm install && npm test
 
 **Nuevos (app):** `domain/models/aviso.dart`,
 `data/services/push_service.dart`, `data/services/notificacion_local_service.dart`,
-`data/services/avisos_service.dart`, `data/repositories/notificaciones_repository.dart`,
+`data/services/avisos_service.dart`, `data/services/pedido_local_service.dart`,
+`data/repositories/notificaciones_repository.dart`,
 `ui/avisos/view_models/avisos_view_model.dart`.
 
 **Nuevos (backend):** `src/eventos.js`, `src/avisos.js`, `src/push.js`,
@@ -294,7 +320,7 @@ secciones 6 y 7), `INFORME_TEORIA_Y_PATRONES.md` e `INFORME_MEJORAS.md`.
 
 | Pendiente | Por qué | Quién / prioridad |
 |---|---|---|
-| Crear el proyecto de Firebase y cargar las dos claves | Necesita una cuenta de Google del grupo (10 min, `docs/NOTIFICACIONES.md`) | **Alta, antes de la EGI** |
+| Pasar la clave del servidor de Firebase a quien levante el backend en la EGI | No está en el repo (es secreta) | **Alta, antes de la EGI** |
 | Probar el APK en un celular de cada uno | Criterio F2 de la grilla (`docs/CELULAR_REAL.md`, tabla "Qué probar") | **Alta** |
 | Correo real para la recuperación (`SMTP_URL`) | Sin eso el código aparece en la consola del servidor | Alta |
 | GPS del repartidor con la pantalla apagada | Servicio en primer plano y permisos que Google Play revisa a mano | Media |
