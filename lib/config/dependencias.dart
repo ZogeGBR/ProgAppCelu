@@ -1,18 +1,22 @@
 import '../data/repositories/carrito_repository.dart';
 import '../data/repositories/catalogo_repository.dart';
 import '../data/repositories/etiquetado_repository.dart';
+import '../data/repositories/notificaciones_repository.dart';
 import '../data/repositories/pago_repository.dart';
 import '../data/repositories/reparto_repository.dart';
 import '../data/repositories/seguimiento_repository.dart';
 import '../data/repositories/sesion_repository.dart';
 import '../data/repositories/ubicacion_entrega_repository.dart';
 import '../data/services/api_client.dart';
+import '../data/services/avisos_service.dart';
 import '../data/services/camara_service.dart';
 import '../data/services/carrito_local_service.dart';
 import '../data/services/catalogo_service.dart';
 import '../data/services/etiquetado_service.dart';
 import '../data/services/geocodificacion_service.dart';
+import '../data/services/notificacion_local_service.dart';
 import '../data/services/pago_service.dart';
+import '../data/services/push_service.dart';
 import '../data/services/reparto_service.dart';
 import '../data/services/seguimiento_service.dart';
 import '../data/services/sesion_service.dart';
@@ -50,14 +54,20 @@ class Dependencias {
     required this.reparto,
     required this.carrito,
     required this.ubicacionEntrega,
+    required this.notificaciones,
     this.pistaClaves,
   });
 
-  factory Dependencias.desdeConfiguracion() {
+  /// [hayFirebase]: si Firebase arrancó (ver main.dart). Sin Firebase la app
+  /// anda igual, pero sin notificaciones push del backend.
+  factory Dependencias.desdeConfiguracion({bool hayFirebase = false}) {
     if (!AppConfig.usaBackend) return Dependencias.simuladas();
 
     final api = ApiClient(urlBase: AppConfig.urlBackend);
     final catalogo = CatalogoRepository(service: CatalogoServiceHttp(api));
+    final sesion = SesionRepository(service: SesionServiceHttp(api));
+    // Observer: el cliente HTTP usa el token de quien haya ingresado.
+    sesion.cambios.listen((actual) => api.usarToken(actual?.token));
     return Dependencias(
       catalogo: catalogo,
       seguimiento: SeguimientoRepository(service: SeguimientoServiceHttp(api)),
@@ -69,10 +79,7 @@ class Dependencias {
         service: PagoServiceHttp(api),
         checkout: const CheckoutLauncherExterno(),
       ),
-      sesion: SesionRepository(
-        service: SesionServiceHttp(api),
-        alCambiarToken: api.usarToken,
-      ),
+      sesion: sesion,
       reparto: RepartoRepository(
         service: RepartoServiceHttp(api),
         ubicacion: const UbicacionServiceGeolocator(),
@@ -83,6 +90,15 @@ class Dependencias {
       ubicacionEntrega: UbicacionEntregaRepository(
         geocodificacion: GeocodificacionServiceHttp(api),
         gps: const UbicacionServiceGeolocator(),
+      ),
+      notificaciones: NotificacionesRepository(
+        // Sin Firebase, un push que nunca recibe nada y no tiene token: la
+        // app no se rompe y no anota nada en el backend.
+        push: hayFirebase
+            ? PushServiceFirebase()
+            : PushServiceSimulado(token: null),
+        local: NotificacionLocalServicePlugin(),
+        servidor: AvisosServiceHttp(api),
       ),
     );
   }
@@ -100,14 +116,19 @@ class Dependencias {
     UbicacionService? ubicacionService,
     CarritoLocalService? carritoLocalService,
     GeocodificacionService? geocodificacionService,
+    NotificacionLocalService? notificacionLocal,
+    PushService? push,
     Duration intervaloPago = const Duration(seconds: 1),
   }) {
+    // El "servidor" de la demo manda los avisos por este push simulado.
+    final pushDemo = PushServiceSimulado();
     return Dependencias(
       catalogo: CatalogoRepository(
         service: catalogoService ?? CatalogoServiceLocal(),
       ),
       seguimiento: SeguimientoRepository(
-        service: seguimientoService ?? const SeguimientoServiceSimulado(),
+        service:
+            seguimientoService ?? SeguimientoServiceSimulado(push: pushDemo),
       ),
       etiquetado: EtiquetadoRepository(
         camara: camara ?? CamaraServiceImagePicker(),
@@ -133,6 +154,11 @@ class Dependencias {
             geocodificacionService ?? const GeocodificacionServiceSimulado(),
         gps: ubicacionService ?? const UbicacionServiceGeolocator(),
       ),
+      notificaciones: NotificacionesRepository(
+        push: push ?? pushDemo,
+        local: notificacionLocal ?? NotificacionLocalServicePlugin(),
+        servidor: const AvisosServiceSimulado(),
+      ),
       pistaClaves: 'Demo: ${SesionServiceSimulado.emailDueno} o '
           '${SesionServiceSimulado.emailRepartidor}, contraseña '
           '"${SesionServiceSimulado.claveInicial}". Si la olvidás, el '
@@ -148,6 +174,7 @@ class Dependencias {
   final RepartoRepository reparto;
   final CarritoRepository carrito;
   final UbicacionEntregaRepository ubicacionEntrega;
+  final NotificacionesRepository notificaciones;
 
   /// Solo en la demo: qué cuentas se pueden usar para ingresar.
   final String? pistaClaves;

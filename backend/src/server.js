@@ -3,10 +3,16 @@
 //   cp .env.example .env   (completar las claves)
 //   node --env-file=.env src/server.js
 import { crearApp } from './app.js';
+import { crearPush } from './push.js';
 
 const puerto = Number(process.env.PORT ?? 3000);
 
+// Notificaciones push: con FIREBASE_CREDENCIALES se mandan por Firebase;
+// sin eso, se muestran en la consola.
+const push = await crearPush({ credenciales: process.env.FIREBASE_CREDENCIALES });
+
 const app = crearApp({
+  push,
   mpAccessToken: process.env.MP_ACCESS_TOKEN,
   mpSandbox: process.env.MP_SANDBOX === 'true',
   mpWebhookSecret: process.env.MP_WEBHOOK_SECRET,

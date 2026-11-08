@@ -10,15 +10,11 @@ class IngresarScreen extends StatefulWidget {
   const IngresarScreen({
     super.key,
     required this.viewModel,
-    required this.alIngresar,
     required this.crearRecuperacion,
     this.pista,
   });
 
   final SesionViewModel viewModel;
-
-  /// Se llama con la pantalla ya cerrada, cuando los datos fueron correctos.
-  final VoidCallback alIngresar;
 
   /// Arma el ViewModel de "¿Olvidaste tu contraseña?" con el email escrito.
   final RecuperarClaveViewModel Function(String email) crearRecuperacion;
@@ -45,8 +41,9 @@ class _IngresarScreenState extends State<IngresarScreen> {
     await widget.viewModel.ingresar(_email.text, _clave.text);
     // Después del await la pantalla puede no existir más.
     if (!mounted || !widget.viewModel.haySesion) return;
+    // La barra de abajo observa la sesión y abre la sección que
+    // corresponde: acá solo se cierra esta pantalla.
     Navigator.pop(context);
-    widget.alIngresar();
   }
 
   Future<void> _olvideMiClave() async {

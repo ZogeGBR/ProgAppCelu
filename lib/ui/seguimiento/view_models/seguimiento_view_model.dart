@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/pago_repository.dart';
 import '../../../data/repositories/seguimiento_repository.dart';
 import '../../../domain/models/estado_pedido.dart';
 import '../../../domain/models/pedido.dart';
@@ -9,11 +10,22 @@ import '../../../domain/models/posicion.dart';
 import '../../../domain/models/seguimiento_pedido.dart';
 
 /// Estado de la pantalla "Mi pedido": la etapa y el repartidor en el mapa.
+///
+/// Usa Observer dos veces:
+/// - con [pagos], observa los pedidos confirmados y empieza a seguir el
+///   nuevo solo, sin que la pantalla de pago lo llame;
+/// - se suscribe al Stream del seguimiento: cada novedad del repartidor
+///   llega a [_alRecibirNovedad] y se avisa a la vista.
 class SeguimientoViewModel extends ChangeNotifier {
-  SeguimientoViewModel({required SeguimientoRepository repositorio})
-      : _repositorio = repositorio;
+  SeguimientoViewModel({
+    required SeguimientoRepository repositorio,
+    PagoRepository? pagos,
+  }) : _repositorio = repositorio {
+    _suscripcionPagos = pagos?.pedidosConfirmados.listen(seguir);
+  }
 
   final SeguimientoRepository _repositorio;
+  late final StreamSubscription<Pedido>? _suscripcionPagos;
 
   Pedido? _pedido;
   SeguimientoPedido? _seguimiento;
@@ -75,6 +87,7 @@ class SeguimientoViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_suscripcionPagos?.cancel());
     _cancelarSuscripcion();
     super.dispose();
   }

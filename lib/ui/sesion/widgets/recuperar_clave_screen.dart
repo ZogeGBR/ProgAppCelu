@@ -88,7 +88,8 @@ String? _mensajeDe(ErrorRecuperacion error) => switch (error) {
         'El código tiene ${RecuperarClaveViewModel.largoCodigo} números.',
       ErrorRecuperacion.claveCorta => 'Tiene que tener al menos '
           '${RecuperarClaveViewModel.largoMinimoClave} caracteres.',
-      ErrorRecuperacion.clavesDistintas => 'Las dos contraseñas no son iguales.',
+      ErrorRecuperacion.clavesDistintas =>
+        'Las dos contraseñas no son iguales.',
       ErrorRecuperacion.codigoIncorrecto =>
         'El código no es correcto o ya venció.',
       ErrorRecuperacion.sinConexion =>

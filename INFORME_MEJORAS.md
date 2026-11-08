@@ -180,7 +180,7 @@ de carga. Falta repetirlo en el servidor real.
 | Avisar al cliente si cambió el precio o se acabó un producto de su carrito | El servidor cobra el precio actual y rechaza lo que no hay, pero la app solo muestra un error general | Media |
 | Cuentas individuales para los repartidores | Hoy todos comparten una clave, así que no se sabe quién lleva cada pedido | Media |
 | Volver solo a la app después de pagar (deep link) | Hoy vuelve con una página web y la app detecta el pago consultando | Media |
-| Notificaciones push ("tu pedido está en camino") | Avisar sin tener la app abierta (Firebase Cloud Messaging) | Media |
+| ~~Notificaciones push ("tu pedido está en camino")~~ | **Hecho el 07-11** (ver `docs/NOTIFICACIONES.md`) | — |
 | Guardar la foto del producto y mostrarla en el catálogo | Hoy el catálogo usa emojis | Media |
 | Proveedor de mapas para producción | Los mosaicos públicos de OpenStreetMap tienen límite de uso justo; con muchos usuarios conviene MapTiler, Stadia o un caché propio | Media |
 | Pruebas de usabilidad con clientes reales del almacén | Confirmar que personas mayores completan una compra sin ayuda | Media |

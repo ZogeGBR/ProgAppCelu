@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 
 import { obtenerBd } from './bd.js';
+import { anunciar, EVENTOS } from './eventos.js';
 import { buscarProducto, ErrorDeValidacion } from './catalogo.js';
 
 const MAXIMA_CANTIDAD = 99;
@@ -138,6 +139,7 @@ function guardarPedido(pedido, items, total) {
       efectivo ? 'aprobado' : 'pendiente',
       efectivo ? Date.now() : null,
     );
+  if (efectivo) anunciar(EVENTOS.pedidoAprobado, buscarPedido(id));
   return { id, numero: Number(lastInsertRowid) };
 }
 
@@ -200,6 +202,7 @@ export function marcarPago(pedidoId, estado) {
   obtenerBd()
     .prepare('UPDATE pedidos SET estado_pago = ?, aprobado_en = ? WHERE id = ?')
     .run(estado, estado === 'aprobado' ? Date.now() : null, pedidoId);
+  if (estado === 'aprobado') anunciar(EVENTOS.pedidoAprobado, buscarPedido(pedidoId));
 }
 
 /**

@@ -64,7 +64,8 @@ void main() {
 
   test('el mismo lugar no se consulta dos veces (caché)', () async {
     await viewModel.marcar(casa);
-    await viewModel.marcar(const Posicion(latitud: -32.88101, longitud: -68.84));
+    await viewModel
+        .marcar(const Posicion(latitud: -32.88101, longitud: -68.84));
 
     expect(geocodificacion.consultas, 1);
   });

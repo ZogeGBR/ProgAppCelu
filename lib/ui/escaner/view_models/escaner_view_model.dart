@@ -11,18 +11,18 @@ enum PasoEscaner { inicio, analizando, revisando, guardando, guardado, error }
 ///
 /// La IA solo propone: nada se guarda hasta que el dueño toca
 /// "Guardar producto".
+///
+/// No avisa a nadie al guardar: el [CatalogoRepository] publica el
+/// catálogo nuevo y "Comprar" y "Mi almacén" lo observan (patrón Observer).
 class EscanerViewModel extends ChangeNotifier {
   EscanerViewModel({
     required EtiquetadoRepository etiquetado,
     required CatalogoRepository catalogo,
-    VoidCallback? alGuardar,
   })  : _etiquetado = etiquetado,
-        _catalogo = catalogo,
-        _alGuardar = alGuardar;
+        _catalogo = catalogo;
 
   final EtiquetadoRepository _etiquetado;
   final CatalogoRepository _catalogo;
-  final VoidCallback? _alGuardar;
 
   PasoEscaner _paso = PasoEscaner.inicio;
   Uint8List? _foto;
@@ -75,7 +75,6 @@ class EscanerViewModel extends ChangeNotifier {
     try {
       final producto = await _catalogo.agregarProducto(ficha);
       _ultimoGuardado = producto.nombre;
-      _alGuardar?.call();
       _cambiarPaso(PasoEscaner.guardado);
     } on Exception {
       _cambiarPaso(PasoEscaner.error);

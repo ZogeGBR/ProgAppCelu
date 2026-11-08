@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../data/repositories/pago_repository.dart';
@@ -7,6 +5,7 @@ import '../../../data/repositories/sesion_repository.dart';
 import '../../../data/repositories/ubicacion_entrega_repository.dart';
 import '../../almacen/view_models/almacen_view_model.dart';
 import '../../almacen/widgets/almacen_screen.dart';
+import '../../avisos/view_models/avisos_view_model.dart';
 import '../../carrito/view_models/carrito_view_model.dart';
 import '../../carrito/widgets/carrito_screen.dart';
 import '../../catalogo/view_models/catalogo_view_model.dart';
@@ -42,6 +41,7 @@ class InicioScreen extends StatelessWidget {
     required this.sesion,
     required this.almacen,
     required this.reparto,
+    this.avisos,
     required this.pagoRepositorio,
     required this.sesionRepositorio,
     required this.ubicacionEntregaRepositorio,
@@ -56,6 +56,7 @@ class InicioScreen extends StatelessWidget {
   final SesionViewModel sesion;
   final AlmacenViewModel almacen;
   final RepartoViewModel reparto;
+  final AvisosViewModel? avisos;
   final PagoRepository pagoRepositorio;
   final SesionRepository sesionRepositorio;
   final UbicacionEntregaRepository ubicacionEntregaRepositorio;
@@ -77,27 +78,14 @@ class InicioScreen extends StatelessWidget {
         repositorio: sesionRepositorio,
         email: email,
       ),
-      alIngresar: _alIngresar,
     );
     Navigator.of(context)
         .push(MaterialPageRoute<void>(builder: (_) => pantalla));
   }
 
-  void _alIngresar() {
-    if (sesion.esDueno) {
-      unawaited(almacen.cargar(forzar: true));
-      navegacion.irA(Seccion.almacen);
-    } else {
-      unawaited(reparto.cargar());
-      navegacion.irA(Seccion.repartir);
-    }
-  }
-
-  void _salir() {
-    reparto.detener();
-    sesion.salir();
-    navegacion.irA(Seccion.comprar);
-  }
+  // Al entrar o salir no hace falta avisarle a nadie: la barra, "Mi
+  // almacén" y el reparto observan la sesión (patrón Observer).
+  void _salir() => sesion.salir();
 
   void _abrirCargaConFoto(BuildContext context) {
     final pantalla = EscanerScreen(viewModel: escaner);
@@ -110,10 +98,6 @@ class InicioScreen extends StatelessWidget {
       viewModel: PagoViewModel(
         repositorio: pagoRepositorio,
         armarPedido: carrito.armarPedido,
-        alAprobar: (pedido) {
-          carrito.vaciarCarrito();
-          seguimiento.seguir(pedido);
-        },
       ),
       items: carrito.items,
       total: carrito.total,
@@ -173,6 +157,7 @@ class InicioScreen extends StatelessWidget {
         ),
       Seccion.miPedido => SeguimientoScreen(
           viewModel: seguimiento,
+          avisos: avisos,
           alIrAComprar: () => navegacion.irA(Seccion.comprar),
         ),
       Seccion.almacen => AlmacenScreen(

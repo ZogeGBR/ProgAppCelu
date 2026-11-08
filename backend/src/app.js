@@ -26,6 +26,9 @@ import { marcarEntregado, registrarPosicion, seguimientoDe } from './seguimiento
 import { crearCorreo } from './correo.js';
 import { crearGeocodificador } from './geo.js';
 import { confirmarCodigo, solicitarCodigo } from './recuperacion.js';
+import { anotarParaPedido, anotarParaRol, conectarAvisos, olvidarCuenta, tokenValido } from './avisos.js';
+import { reiniciarEventos } from './eventos.js';
+import { pushEnConsola } from './push.js';
 import { crearLimitadorDeIntentos, crearToken, exigirRol } from './sesiones.js';
 import { asegurarUsuario, verificarCredenciales } from './usuarios.js';
 
@@ -45,12 +48,14 @@ export function crearApp(config = {}) {
     contactoMapas,
     geocodificacion = 'nominatim',
     correo: correoInyectado,
+    push = pushEnConsola(),
     secretoSesion = crypto.randomBytes(32).toString('hex'),
     simularReparto = !mpAccessToken,
   } = config;
 
   abrirBd(rutaBd);
   for (const usuario of usuariosIniciales) asegurarUsuario(usuario);
+  conectarAvisos(reiniciarEventos(), push);
 
   const correo = correoInyectado ?? crearCorreo({ smtpUrl, remitente: remitenteCorreo });
   const direccionDe = crearGeocodificador({
@@ -259,6 +264,32 @@ export function crearApp(config = {}) {
   // El repartidor avisa que entregó.
   app.post('/pedidos/:pedidoId/entregado', soloReparto, (req, res) => {
     res.sendStatus(marcarEntregado(req.params.pedidoId) ? 204 : 404);
+  });
+
+  // --- Notificaciones push: qué celular recibe qué aviso ---
+  // El cliente anota su celular para seguir su pedido (no tiene cuenta).
+  app.post('/pedidos/:pedidoId/avisos', (req, res) => {
+    const token = req.body?.token;
+    if (!tokenValido(token)) return res.status(400).json({ error: 'Token inválido.' });
+    const pedido = buscarPedido(req.params.pedidoId);
+    if (!pedido) return res.status(404).json({ error: 'Pedido inexistente.' });
+    anotarParaPedido(token, pedido.id);
+    return res.sendStatus(204);
+  });
+
+  // El dueño y el repartidor, para enterarse de cada pedido nuevo.
+  app.post('/dispositivos', soloReparto, (req, res) => {
+    const token = req.body?.token;
+    if (!tokenValido(token)) return res.status(400).json({ error: 'Token inválido.' });
+    anotarParaRol(token, req.rol);
+    return res.sendStatus(204);
+  });
+
+  // Sin sesión a propósito: la app lo llama DESPUÉS de cerrarla. Tener el
+  // token del celular (largo y secreto) alcanza para darlo de baja.
+  app.delete('/dispositivos/:token', (req, res) => {
+    olvidarCuenta(req.params.token);
+    res.sendStatus(204);
   });
 
   // eslint-disable-next-line no-unused-vars

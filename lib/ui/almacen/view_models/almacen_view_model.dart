@@ -1,19 +1,33 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/catalogo_repository.dart';
+import '../../../data/repositories/sesion_repository.dart';
 import '../../../domain/models/producto.dart';
+import '../../../domain/models/sesion.dart';
 import '../../core/estado_carga.dart';
 
 /// Estado de "Mi almacén": lo que Don Ceferino cambia todos los días.
+///
+/// Observa dos sujetos (patrón Observer):
+/// - el [CatalogoRepository]: cualquier cambio del catálogo (también el
+///   producto que se cargó con la foto) llega solo a esta lista;
+/// - el [SesionRepository], si se lo pasan: cuando entra el dueño, carga
+///   el catálogo fresco del servidor.
 class AlmacenViewModel extends ChangeNotifier {
   AlmacenViewModel({
     required CatalogoRepository repositorio,
-    VoidCallback? alCambiarCatalogo,
-  })  : _repositorio = repositorio,
-        _alCambiarCatalogo = alCambiarCatalogo;
+    SesionRepository? sesion,
+  }) : _repositorio = repositorio {
+    _suscripciones = [
+      repositorio.cambios.listen(_alCambiarCatalogo),
+      if (sesion != null) sesion.cambios.listen(_alCambiarSesion),
+    ];
+  }
 
   final CatalogoRepository _repositorio;
-  final VoidCallback? _alCambiarCatalogo;
+  late final List<StreamSubscription<Object?>> _suscripciones;
 
   EstadoCarga _estado = EstadoCarga.cargando;
   List<Producto> _productos = const [];
@@ -54,16 +68,26 @@ class AlmacenViewModel extends ChangeNotifier {
   Future<void> eliminar(Producto producto) =>
       _guardar(() => _repositorio.eliminar(producto.id));
 
+  // La lista nueva NO se arma acá: llega por _alCambiarCatalogo, igual
+  // que le llega a "Comprar".
   Future<void> _guardar(Future<void> Function() cambio) async {
     _fallo = false;
     try {
       await cambio();
-      _productos = await _repositorio.obtenerProductos();
-      _alCambiarCatalogo?.call();
     } on Exception {
       _fallo = true;
     }
     _avisar();
+  }
+
+  void _alCambiarCatalogo(List<Producto> productos) {
+    _productos = productos;
+    _estado = EstadoCarga.exito;
+    _avisar();
+  }
+
+  void _alCambiarSesion(Sesion? sesion) {
+    if (sesion?.rol == Rol.dueno) unawaited(cargar(forzar: true));
   }
 
   void _avisar() {
@@ -73,6 +97,9 @@ class AlmacenViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _descartado = true;
+    for (final suscripcion in _suscripciones) {
+      unawaited(suscripcion.cancel());
+    }
     super.dispose();
   }
 }

@@ -70,7 +70,6 @@ void main() {
         checkout: CheckoutFalso(),
       ),
       armarPedido: CarritoViewModel().armarPedido,
-      alAprobar: (_) {},
     );
     const casa = Posicion(latitud: -32.88, longitud: -68.84);
 

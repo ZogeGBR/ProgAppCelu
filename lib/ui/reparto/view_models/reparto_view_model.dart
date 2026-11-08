@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/notificaciones_repository.dart';
 import '../../../data/repositories/reparto_repository.dart';
+import '../../../data/repositories/sesion_repository.dart';
+import '../../../domain/models/aviso.dart';
 import '../../../domain/models/pedido_reparto.dart';
 import '../../../domain/models/permiso_ubicacion.dart';
 import '../../../domain/models/posicion.dart';
+import '../../../domain/models/sesion.dart';
 
 enum PasoReparto {
   cargando,
@@ -18,11 +22,28 @@ enum PasoReparto {
 
 /// Estado del modo repartidor: qué pedidos hay y, mientras lleva uno,
 /// manda su posición para que el cliente lo vea en el mapa.
+///
+/// Observa (patrón Observer):
+/// - la sesión: cuando entra un repartidor carga sus pedidos y cuando la
+///   sesión se cierra apaga el GPS. Nadie tiene que acordarse de llamarlo;
+/// - los avisos: si llega "Nuevo pedido" mientras elige, la lista se
+///   actualiza sola.
 class RepartoViewModel extends ChangeNotifier {
-  RepartoViewModel({required RepartoRepository repositorio})
-      : _repositorio = repositorio;
+  RepartoViewModel({
+    required RepartoRepository repositorio,
+    SesionRepository? sesion,
+    NotificacionesRepository? notificaciones,
+  }) : _repositorio = repositorio {
+    _suscripciones = [
+      if (sesion != null) sesion.cambios.listen(_alCambiarSesion),
+      if (notificaciones != null)
+        notificaciones.recibidos.listen(_alRecibirAviso),
+    ];
+  }
 
   final RepartoRepository _repositorio;
+  late final List<StreamSubscription<Object?>> _suscripciones;
+  Rol? _rol;
 
   PasoReparto _paso = PasoReparto.cargando;
   List<PedidoReparto> _pedidos = const [];
@@ -107,12 +128,30 @@ class RepartoViewModel extends ChangeNotifier {
     await cargar();
   }
 
-  /// Se llama al cerrar la sesión.
+  /// Apaga el GPS y olvida los pedidos. Pasa solo al cerrar la sesión.
   void detener() {
     _cancelarGps();
     _actual = null;
     _pedidos = const [];
-    _paso = PasoReparto.cargando;
+    _cambiar(PasoReparto.cargando);
+  }
+
+  void _alCambiarSesion(Sesion? sesion) {
+    _rol = sesion?.rol;
+    if (sesion == null) {
+      detener();
+    } else if (sesion.rol == Rol.repartidor) {
+      unawaited(cargar());
+    }
+  }
+
+  // Solo si hay alguien del almacén y no está en medio de un reparto.
+  void _alRecibirAviso(Aviso aviso) {
+    final eligiendo =
+        _paso == PasoReparto.eligiendo || _paso == PasoReparto.error;
+    if (aviso.tipo == TipoAviso.nuevoPedido && _rol != null && eligiendo) {
+      unawaited(cargar());
+    }
   }
 
   Future<void> _alMoverse(Posicion posicion) async {
@@ -151,6 +190,9 @@ class RepartoViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _descartado = true;
+    for (final suscripcion in _suscripciones) {
+      unawaited(suscripcion.cancel());
+    }
     _cancelarGps();
     super.dispose();
   }
