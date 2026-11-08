@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../domain/models/sesion.dart';
 import '../services/api_client.dart';
 import '../services/sesion_service.dart';
@@ -11,22 +13,34 @@ enum ResultadoCambioClave { cambiada, codigoIncorrecto }
 /// La sesión vive solo en memoria: al cerrar la app hay que volver a
 /// ingresar. Es a propósito, para no dejar la cuenta abierta en un celular
 /// que puede quedar sobre el mostrador.
+///
+/// Patrón Observer: el repositorio es el **sujeto** de la sesión. Cuando
+/// alguien entra o sale publica la sesión nueva (o null) en [cambios].
+/// Lo observan el [ApiClient] (para usar el token), la barra de abajo
+/// (qué secciones mostrar), "Mi almacén", el reparto y las notificaciones.
+/// Ninguno de ellos se llama entre sí.
 class SesionRepository {
-  SesionRepository({
-    required SesionService service,
-    void Function(String? token)? alCambiarToken,
-  })  : _service = service,
-        _alCambiarToken = alCambiarToken;
+  SesionRepository({required SesionService service}) : _service = service;
 
   final SesionService _service;
-  final void Function(String? token)? _alCambiarToken;
+  Sesion? _actual;
+
+  // `sync: true`: el token ya está puesto cuando `ingresar` termina, así
+  // el primer pedido del dueño ya viaja autenticado.
+  final _cambios = StreamController<Sesion?>.broadcast(sync: true);
+
+  /// Emite la sesión nueva al entrar y null al salir.
+  Stream<Sesion?> get cambios => _cambios.stream;
+
+  /// La sesión de este momento (null: es un cliente).
+  Sesion? get actual => _actual;
 
   /// Devuelve la sesión, o null si email o contraseña no coinciden. Un
   /// problema de conexión se propaga como excepción: no es lo mismo.
   Future<Sesion?> ingresar(String email, String clave) async {
     try {
       final sesion = Sesion.fromJson(await _service.ingresar(email, clave));
-      _alCambiarToken?.call(sesion.token);
+      _publicar(sesion);
       return sesion;
     } on ApiException catch (error) {
       if (error.codigo == 401) return null;
@@ -34,7 +48,10 @@ class SesionRepository {
     }
   }
 
-  void salir() => _alCambiarToken?.call(null);
+  void salir() {
+    if (_actual == null) return;
+    _publicar(null);
+  }
 
   Future<void> solicitarCodigo(String email) => _service.solicitarCodigo(email);
 
@@ -55,4 +72,11 @@ class SesionRepository {
       rethrow;
     }
   }
+
+  void _publicar(Sesion? sesion) {
+    _actual = sesion;
+    _cambios.add(sesion);
+  }
+
+  void dispose() => unawaited(_cambios.close());
 }

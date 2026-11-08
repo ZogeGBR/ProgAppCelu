@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/config/dependencias.dart';
 import 'package:freshmarket_app/data/services/carrito_local_service.dart';
 import 'package:freshmarket_app/data/services/sesion_service.dart';
+import 'package:freshmarket_app/domain/models/aviso.dart';
 import 'package:freshmarket_app/main.dart';
 
 import 'fakes.dart';
@@ -10,7 +11,11 @@ import 'fakes.dart';
 void main() {
   late SeguimientoServiceFalso seguimiento;
 
-  Future<void> abrirApp(WidgetTester tester) async {
+  Future<void> abrirApp(
+    WidgetTester tester, {
+    PushFalso? push,
+    NotificacionLocalFalsa? local,
+  }) async {
     seguimiento = SeguimientoServiceFalso();
     final dependencias = Dependencias.simuladas(
       catalogoService: CatalogoServiceFalso(),
@@ -20,6 +25,9 @@ void main() {
       carritoLocalService: CarritoLocalServiceMemoria(),
       geocodificacionService: GeocodificacionFalsa(),
       ubicacionService: UbicacionFalsa(),
+      // Sin el plugin real: en las pruebas no hay barra de notificaciones.
+      notificacionLocal: local ?? NotificacionLocalFalsa(),
+      push: push,
     );
     await tester.pumpWidget(FreshMarketApp(dependencias: dependencias));
     await tester.pumpAndSettle();
@@ -196,7 +204,8 @@ void main() {
     testWidgets('el repartidor ve sus pedidos', (tester) async {
       await abrirApp(tester);
 
-      await ingresarCon(tester, SesionServiceSimulado.emailRepartidor, claveDemo);
+      await ingresarCon(
+          tester, SesionServiceSimulado.emailRepartidor, claveDemo);
 
       expect(find.text('Salir a repartir'), findsOneWidget);
     });
@@ -243,6 +252,47 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Cargar producto con una foto'), findsOneWidget);
+    });
+  });
+
+  group('notificaciones', () {
+    const enCamino = Aviso(
+      titulo: 'Tu pedido #1001 está en camino',
+      cuerpo: 'El repartidor ya salió.',
+      pedidoId: 'p-1',
+    );
+
+    testWidgets('un aviso con la app abierta se muestra en la barra',
+        (tester) async {
+      final push = PushFalso();
+      final local = NotificacionLocalFalsa();
+      await abrirApp(tester, push: push, local: local);
+
+      push.enviar(enCamino);
+      await tester.pumpAndSettle();
+
+      expect(local.mostradas.single.titulo, enCamino.titulo);
+    });
+
+    testWidgets(
+        'tocar el aviso desde el pago cierra el pago y abre "Mi pedido"',
+        (tester) async {
+      final push = PushFalso();
+      await abrirApp(tester, push: push);
+      await tester.tap(find.text('Agregar').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Ver mi carrito'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ir a pagar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Calle y número'), findsOneWidget);
+
+      push.tocar(enCamino);
+      await tester.pumpAndSettle();
+
+      // Se cerró el pago y se ve "Mi pedido" (todavía sin pedido).
+      expect(find.text('Calle y número'), findsNothing);
+      expect(find.text('Todavía no hiciste ningún pedido.'), findsOneWidget);
     });
   });
 }

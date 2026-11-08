@@ -24,7 +24,8 @@ flowchart TB
 
     V -- "llama comandos" --> VM
     VM -- "notifyListeners() (Observer)" --> V
-    VM --> R
+    VM -- "llama comandos" --> R
+    R -- "Stream de cambios (Observer)" --> VM
     R --> S
     S -- "HTTP" --> BE
     V -.usa.-> M
@@ -44,12 +45,15 @@ Reglas que se cumplen en todo el proyecto (y que se pueden verificar con
 | Ningún ViewModel importa la capa de servicios | `grep -rn "data/services" lib/ui/*/view_models` no devuelve nada |
 | Los servicios no guardan estado de la app | Solo los simulados, que hacen de "servidor" (está comentado en cada uno) |
 | Los repositorios no dependen entre sí | Cada uno recibe solo servicios en su constructor |
+| Ningún ViewModel llama a otro ViewModel | Ningún constructor de ViewModel recibe otro ViewModel ni un callback `al...` hacia otro: se comunican observando repositorios (sección 6) |
 | Encapsulamiento: estado privado, getters públicos, listas inmutables hacia afuera | Todos los campos que cambian empiezan con `_`; `items` devuelve `List.unmodifiable` |
 
 ## 2. Diagrama de clases
 
 Para que se lea, cada interfaz de servicio aparece con sus
 implementaciones (real y simulada) y cada pantalla con su ViewModel.
+Las flechas punteadas con la etiqueta **observa** son suscripciones a un
+`Stream` del repositorio (patrón Observer, sección 6).
 
 ```mermaid
 classDiagram
@@ -117,20 +121,37 @@ classDiagram
     class AlmacenViewModel
     class EscanerViewModel
     class RepartoViewModel
+    class AvisosViewModel {
+      +permisoDenegado bool
+      +iniciar()
+      +pedirPermiso()
+    }
 
     %% ---------- Repositorios ----------
     class CatalogoRepository {
       -List~Producto~ _cache
+      +cambios Stream~List~
     }
     class CarritoRepository
-    class PagoRepository
+    class PagoRepository {
+      +pedidosConfirmados Stream~Pedido~
+    }
+    class NotificacionesRepository {
+      +recibidos Stream~Aviso~
+      +tocados Stream~Aviso~
+      +seguirPedido(Pedido)
+      +anotarCuenta()
+      +olvidarCuenta()
+    }
     class UbicacionEntregaRepository {
       -Map _cache
       +direccionDe(Posicion) String
       +miPosicion() Posicion
     }
     class SeguimientoRepository
-    class SesionRepository
+    class SesionRepository {
+      +cambios Stream~Sesion~
+    }
     class EtiquetadoRepository
     class RepartoRepository
 
@@ -146,6 +167,9 @@ classDiagram
     class EtiquetadoService {<<interface>>}
     class CamaraService {<<interface>>}
     class RepartoService {<<interface>>}
+    class PushService {<<interface>>}
+    class NotificacionLocalService {<<interface>>}
+    class AvisosService {<<interface>>}
     class ApiClient {
       -String _token
       +usarToken(String)
@@ -169,6 +193,7 @@ classDiagram
     AlmacenScreen --> AlmacenViewModel
     EscanerScreen --> EscanerViewModel
     RepartoScreen --> RepartoViewModel
+    SeguimientoScreen --> AvisosViewModel
 
     %% ViewModels -> Repositorios
     CatalogoViewModel --> CatalogoRepository
@@ -182,6 +207,20 @@ classDiagram
     EscanerViewModel --> EtiquetadoRepository
     EscanerViewModel --> CatalogoRepository
     RepartoViewModel --> RepartoRepository
+    AvisosViewModel --> NotificacionesRepository
+
+    %% Observer: ViewModels suscriptos a los repositorios
+    CatalogoViewModel ..> CatalogoRepository : observa
+    AlmacenViewModel ..> CatalogoRepository : observa
+    AlmacenViewModel ..> SesionRepository : observa
+    NavegacionViewModel ..> SesionRepository : observa
+    NavegacionViewModel ..> NotificacionesRepository : observa
+    RepartoViewModel ..> SesionRepository : observa
+    RepartoViewModel ..> NotificacionesRepository : observa
+    CarritoViewModel ..> PagoRepository : observa
+    SeguimientoViewModel ..> PagoRepository : observa
+    AvisosViewModel ..> PagoRepository : observa
+    AvisosViewModel ..> SesionRepository : observa
 
     %% Repositorios -> Servicios
     CatalogoRepository --> CatalogoService
@@ -196,6 +235,9 @@ classDiagram
     EtiquetadoRepository --> CamaraService
     RepartoRepository --> RepartoService
     RepartoRepository --> UbicacionService
+    NotificacionesRepository --> PushService
+    NotificacionesRepository --> NotificacionLocalService
+    NotificacionesRepository --> AvisosService
 
     %% Implementaciones (Strategy: real o simulada)
     CatalogoService <|.. CatalogoServiceHttp
@@ -218,6 +260,12 @@ classDiagram
     CamaraService <|.. CamaraServiceImagePicker
     RepartoService <|.. RepartoServiceHttp
     RepartoService <|.. RepartoServiceSimulado
+    PushService <|.. PushServiceFirebase
+    PushService <|.. PushServiceSimulado
+    NotificacionLocalService <|.. NotificacionLocalServicePlugin
+    AvisosService <|.. AvisosServiceHttp
+    AvisosService <|.. AvisosServiceSimulado
+    SeguimientoServiceSimulado --> PushServiceSimulado : manda avisos (demo)
 
     CatalogoServiceHttp --> ApiClient
     PagoServiceHttp --> ApiClient
@@ -226,6 +274,7 @@ classDiagram
     SesionServiceHttp --> ApiClient
     EtiquetadoServiceHttp --> ApiClient
     RepartoServiceHttp --> ApiClient
+    AvisosServiceHttp --> ApiClient
 ```
 
 ### Modelos de dominio
@@ -276,6 +325,15 @@ classDiagram
     class MetodoPago {<<enum>> debito credito billeteraMercadoPago efectivo}
     class EstadoPedido {<<enum>> recibido enPreparacion enCamino entregado}
     class Rol {<<enum>> dueno repartidor}
+    class Aviso {
+      +String titulo
+      +String cuerpo
+      +TipoAviso tipo
+      +String pedidoId
+      +aTexto() String
+    }
+    class TipoAviso {<<enum>> pedido nuevoPedido}
+    Aviso --> TipoAviso
 
     Pedido "1" *-- "1..*" ItemCarrito
     ItemCarrito --> Producto
@@ -397,12 +455,81 @@ erDiagram
       TEXT direccion
       INTEGER creado_en
     }
+    dispositivos {
+      TEXT token "token de Firebase del celular"
+      TEXT pedido_id FK "cliente: avisos de UN pedido"
+      TEXT rol "dueno o repartidor: pedidos nuevos"
+      INTEGER creado_en
+    }
 
     pedidos ||--o| posiciones : "tiene la última posición de"
     usuarios ||--o{ recuperaciones_clave : "pide"
+    pedidos ||--o{ dispositivos : "avisa a"
 ```
+
+`dispositivos` tiene un `CHECK` para que cada fila sea **o** de un pedido
+**o** de un rol (nunca las dos ni ninguna), y un índice único para que un
+celular no se anote dos veces para lo mismo.
 
 `productos` y `pedidos` no tienen clave foránea a propósito: el pedido
 guarda una **foto** de los productos (nombre, precio y cantidad) en
 `items`, para que si Don Ceferino cambia un precio o borra un producto,
 los pedidos ya hechos no cambien.
+
+## 6. Observer entre capas (desde el 07-11)
+
+El Observer se usa en **dos niveles**:
+
+1. **Vista ← ViewModel** (`ChangeNotifier` + `ListenableBuilder`): la vista
+   se redibuja sola cuando el ViewModel llama a `notifyListeners()`.
+2. **ViewModel ← Repositorio** (`Stream` de Dart): el repositorio es la
+   única fuente de verdad y **publica** cada cambio; los ViewModels que lo
+   necesitan se **suscriben** en su constructor y se **dan de baja** en
+   `dispose()`.
+
+| Sujeto (repositorio) | Qué publica | Quién observa |
+|---|---|---|
+| `CatalogoRepository.cambios` | La lista de productos cada vez que cambia | `CatalogoViewModel` ("Comprar"), `AlmacenViewModel` ("Mi almacén") |
+| `SesionRepository.cambios` | La sesión al entrar, `null` al salir | `ApiClient` (token), `SesionViewModel`, `NavegacionViewModel`, `AlmacenViewModel`, `RepartoViewModel`, `AvisosViewModel` |
+| `PagoRepository.pedidosConfirmados` | Cada pedido confirmado, una vez | `CarritoViewModel` (se vacía), `SeguimientoViewModel` (lo sigue), `AvisosViewModel` (anota el celular) |
+| `NotificacionesRepository.recibidos` | Cada aviso que llega con la app abierta | `RepartoViewModel` (recarga la lista) |
+| `NotificacionesRepository.tocados` | Cada notificación tocada | `NavegacionViewModel` (abre la sección) |
+
+Los `StreamController` son `broadcast(sync: true)`: **broadcast** porque
+hay varios observadores; **sync** para que todos se enteren en el mismo
+momento en que cambia el dato (por ejemplo, el `ApiClient` ya tiene el
+token cuando `ingresar()` termina).
+
+Antes, los ViewModels se encadenaban con callbacks armados en `main.dart`
+e `InicioScreen` (`alAprobar`, `alIngresar`, `alGuardar`,
+`alCambiarCatalogo`, `alCambiarToken`). Funcionaba, pero cada pantalla nueva
+obligaba a acordarse de llamar a todas las demás. Ahora quien produce el
+cambio no sabe quién escucha.
+
+```mermaid
+sequenceDiagram
+    participant PV as PagoViewModel
+    participant PR as PagoRepository (sujeto)
+    participant CV as CarritoViewModel
+    participant SV as SeguimientoViewModel
+    participant AV as AvisosViewModel
+
+    PV->>PR: seguirEstado(pedido)
+    PR->>PR: consulta → "aprobado"
+    PR-->>CV: pedidosConfirmados (Observer)
+    CV->>CV: vaciarCarrito() + notifyListeners()
+    PR-->>SV: pedidosConfirmados (Observer)
+    SV->>SV: seguir(pedido) + notifyListeners()
+    PR-->>AV: pedidosConfirmados (Observer)
+    AV->>AV: anota el celular para los avisos del pedido
+    PR-->>PV: ResultadoPago.aprobado
+    PV->>PV: paso = aprobado + notifyListeners()
+```
+
+Las pruebas de este comportamiento están en `test/observer_test.dart`.
+
+## 7. Notificaciones push
+
+Ver [`NOTIFICACIONES.md`](NOTIFICACIONES.md): qué se avisa, el recorrido de
+un aviso desde el backend hasta la barra del celular y cómo configurar
+Firebase.

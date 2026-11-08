@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/catalogo_repository.dart';
@@ -5,13 +7,21 @@ import '../../../domain/models/producto.dart';
 import '../../core/estado_carga.dart';
 
 /// Estado de la pantalla "Comprar": productos, búsqueda y categoría.
+///
+/// Está en el medio de dos Observer:
+/// - **observa** al [CatalogoRepository]: si el dueño cambia un precio en
+///   "Mi almacén", la lista de "Comprar" se actualiza sola;
+/// - **es observado** por la vista (ListenableBuilder) con notifyListeners().
 class CatalogoViewModel extends ChangeNotifier {
   CatalogoViewModel({required CatalogoRepository repositorio})
-      : _repositorio = repositorio;
+      : _repositorio = repositorio {
+    _suscripcion = repositorio.cambios.listen(_alCambiarCatalogo);
+  }
 
   static const todasLasCategorias = 'Todas';
 
   final CatalogoRepository _repositorio;
+  late final StreamSubscription<List<Producto>> _suscripcion;
 
   EstadoCarga _estado = EstadoCarga.cargando;
   List<Producto> _productos = const [];
@@ -40,6 +50,7 @@ class CatalogoViewModel extends ChangeNotifier {
   }
 
   /// Carga el catálogo. También sirve para reintentar después de un error.
+  /// La lista nueva llega por [_alCambiarCatalogo] (el repositorio avisa).
   Future<void> cargar({bool forzar = false}) async {
     _estado = EstadoCarga.cargando;
     _avisar();
@@ -62,6 +73,13 @@ class CatalogoViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Lo llama el repositorio (sujeto) cada vez que el catálogo cambia.
+  void _alCambiarCatalogo(List<Producto> productos) {
+    _productos = productos;
+    _estado = EstadoCarga.exito;
+    _avisar();
+  }
+
   // Si la app se cerró mientras se esperaba la respuesta, el
   // ViewModel ya no existe y no hay a quién avisar.
   void _avisar() {
@@ -71,6 +89,7 @@ class CatalogoViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _descartado = true;
+    unawaited(_suscripcion.cancel());
     super.dispose();
   }
 }

@@ -19,7 +19,8 @@ class ApiClient {
   final http.Client _cliente;
 
   /// La sesión del dueño o del repartidor. Los clientes no tienen.
-  /// Es privada: solo el repositorio de sesión la cambia, con [usarToken].
+  /// Es privada: solo cambia con [usarToken], que se llama cuando el
+  /// repositorio de sesión publica un cambio (ver config/dependencias.dart).
   String? _token;
 
   bool get tieneSesion => _token != null;

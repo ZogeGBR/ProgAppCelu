@@ -27,15 +27,15 @@ propósito: muchos son personas mayores y un registro sería una traba.
 
 | Concepto | ¿Se usó? | Dónde | Por qué / por qué no |
 |---|---|---|---|
-| **Observer** | Sí | Todos los ViewModels (`ChangeNotifier` + `notifyListeners()`), las vistas con `ListenableBuilder`; `Stream` en seguimiento, estado del pago y GPS | Es la base de MVVM: la vista se entera sola de los cambios y el ViewModel no conoce ningún widget |
+| **Observer** | Sí, en dos niveles | **Vista ← ViewModel:** todos los ViewModels (`ChangeNotifier` + `notifyListeners()`) y las vistas con `ListenableBuilder`. **ViewModel ← Repositorio** (desde el 07-11): los repositorios publican sus cambios en un `Stream` (`CatalogoRepository.cambios`, `SesionRepository.cambios`, `PagoRepository.pedidosConfirmados`, `NotificacionesRepository.recibidos/tocados`) y los ViewModels se suscriben. **Backend:** `eventos.js` (`EventEmitter`) avisa "pedido aprobado / en camino / entregado" y `avisos.js` escucha | Es la base de MVVM: la vista se entera sola de los cambios y el ViewModel no conoce ningún widget. En la capa de datos reemplaza los callbacks entre ViewModels: ninguno llama a otro. Ver `INFORME_CAMBIOS_07-11.md`, sección 2 |
 | **MVVM / MVC** | Sí | `ui/*/widgets` (Vista), `ui/*/view_models` (ViewModel, que hace de Controlador), `domain` + `data` (Modelo) | Ver `docs/ARQUITECTURA.md`, sección 4 |
-| **Repository** | Sí | `lib/data/repositories/` (9 repositorios) | Única fuente de verdad: convierte JSON en modelos, guarda caché y decide reintentos y esperas |
+| **Repository** | Sí | `lib/data/repositories/` (9 repositorios, uno nuevo: `NotificacionesRepository`) | Única fuente de verdad: convierte JSON en modelos, guarda caché y decide reintentos y esperas |
 | **Inyección de dependencias** | Sí | Constructores de repositorios y ViewModels; `config/dependencias.dart` arma todo | Permite cambiar real por simulado tocando un solo archivo y probar cada pieza con fakes |
-| **Strategy** | Sí | Cada interfaz de servicio con su versión real y simulada (11 interfaces); `backend/src/correo.js` (SMTP o consola); `backend/src/geo.js` (Google, Nominatim o simulado) | Se elige el comportamiento sin `if` repartidos por el código |
+| **Strategy** | Sí | Cada interfaz de servicio con su versión real y simulada (14 interfaces desde el 07-11); `backend/src/correo.js` (SMTP o consola); `backend/src/geo.js` (Google, Nominatim o simulado) | Se elige el comportamiento sin `if` repartidos por el código |
 | **Factory** | Sí | `fromJson` en los modelos; `Dependencias.desdeConfiguracion()` y `.simuladas()`; `crearCorreo()` y `crearGeocodificador()` en el backend | Un solo lugar sabe cómo construir cada cosa |
 | **Adapter** | Sí | `backend/src/geo.js` convierte las respuestas de Google y de Nominatim (distintas) en `{ direccion }`; los servicios HTTP adaptan el JSON del backend | La app no se entera de qué proveedor de mapas se usa |
 | **Singleton** | Sí, donde corresponde | Backend: una sola conexión a la base (`bd.js`, `abrirBd`/`obtenerBd`). App: `SharedPreferences.getInstance()` | En la app **no** se escribió ninguna clase con `static instancia`: un Singleton clásico es estado global que no se puede reemplazar en las pruebas. `Dependencias` crea **una sola instancia** de cada repositorio y un solo `ApiClient` y los pasa por constructor: misma garantía y se puede probar |
-| **Callbacks** | Sí | `alAprobar`, `alIngresar`, `crearRecuperacion`, `crearElegirUbicacion` | Un ViewModel no conoce a otro: quien arma la pantalla decide qué hacer |
+| **Callbacks** | Sí, solo de vista a padre | `armarPedido`, `crearRecuperacion`, `crearElegirUbicacion`, `alVerPedido`, `onAgregar` | Un widget hijo avisa al padre. Los callbacks **entre ViewModels** (`alAprobar`, `alIngresar`, `alGuardar`, `alCambiarCatalogo`, `alCambiarToken`) se reemplazaron por Observer el 07-11 |
 | **Encapsulamiento e inmutabilidad** | Sí | Estado privado con `_`, getters públicos, `List.unmodifiable`, modelos con `final` y `copiarCon`. El token del `ApiClient` pasó a ser privado (`usarToken`) | Nadie puede cambiar un dato sin pasar por el comando que avisa |
 | **Future / async / await** | Sí | Toda llamada a red, disco, GPS y cámara | — |
 | **Timeout** | Sí | `ApiClient` (10 s), IA (30 s), GPS (15 s), mapa en el backend (8 s), espera del pago (5 min) | Ninguna pantalla queda cargando para siempre |
@@ -53,7 +53,9 @@ propósito: muchos son personas mayores y un registro sería una traba.
 | Detectar conexión (`connectivity_plus`) | No | — | Saber que hay Wi-Fi no garantiza internet. La app decide "sin conexión" por el resultado real de cada llamada (timeout y reintento), que es más confiable |
 | **Segundo plano** (GPS del repartidor con la pantalla apagada) | No, pendiente | — | Requiere un servicio en primer plano con notificación fija y los permisos `ACCESS_BACKGROUND_LOCATION` y `FOREGROUND_SERVICE_LOCATION`, que Google Play revisa a mano. Hoy el repartidor comparte el GPS con la app abierta |
 | Tareas diferidas (`workmanager`) | No | — | No hay nada que sincronizar después: todo se manda en el momento |
-| Notificaciones push (FCM) | No, pendiente | — | Necesita un proyecto de Firebase y un servidor que mande los avisos; queda en "qué faltaría" |
+| **Notificaciones push (FCM)** | Sí (07-11) | App: `PushServiceFirebase` (`firebase_messaging`) + `NotificacionLocalServicePlugin` (`flutter_local_notifications`) + `NotificacionesRepository` + `AvisosViewModel`. Backend: `push.js` (`firebase-admin`), `avisos.js`, tabla `dispositivos` | El cliente se entera cuando su pedido sale y cuando llega, aunque tenga la app cerrada; el almacén, de cada pedido nuevo. Ver `docs/NOTIFICACIONES.md` |
+| Notificaciones locales | Sí (07-11) | `NotificacionLocalServicePlugin` | Con la app abierta Android no muestra el push solo: la app lo muestra. En la demo sin backend, todos los avisos son locales |
+| Permisos en tiempo de ejecución | Sí | Ubicación (`geolocator`), cámara, **notificaciones** (`POST_NOTIFICATIONS`, Android 13+) | Se piden cuando hacen falta y, si se niegan, la app sigue y explica para qué sirven ("Activá las notificaciones" en "Mi pedido") |
 | Canales de plataforma (`MethodChannel` / `EventChannel`) | No directo | Los usan por dentro `geolocator`, `image_picker`, `url_launcher` y `shared_preferences` | No hay ninguna función nativa que no tenga ya un paquete oficial |
 | **Código limpio** | Sí | Nombres en español consistentes, una función una cosa, constantes con nombre, enums en vez de números, `switch` de expresión, comentarios que explican el porqué | `analysis_options.yaml` suma `prefer_single_quotes`, `unawaited_futures` y `use_build_context_synchronously` |
 | **Refactoring con pruebas** | Sí | Cada cambio se hizo con las pruebas existentes como red de seguridad y se sumaron pruebas nuevas | — |
@@ -62,10 +64,11 @@ propósito: muchos son personas mayores y un registro sería una traba.
 
 | Regla | Estado |
 |---|---|
+| Ningún ViewModel llama a otro ViewModel | **Se corrigió (07-11)**: antes se encadenaban con callbacks (`alAprobar` vaciaba el carrito y arrancaba el seguimiento). Ahora cada uno observa al repositorio que le interesa |
 | Ninguna vista habla con la red | Cumple (`grep "ApiClient\|http\." lib/ui` vacío) |
 | Ningún ViewModel importa `material.dart` | Cumple |
 | Ningún ViewModel importa la capa de servicios | **Se corrigió**: `RepartoViewModel` importaba `ubicacion_service.dart` para usar `PermisoUbicacion`; ese enum pasó al dominio (`domain/models/permiso_ubicacion.dart`) |
-| Ningún campo público se puede modificar desde afuera | **Se corrigió**: `ApiClient.token` era público y cualquiera podía cambiarlo. Ahora es privado y solo se cambia con `usarToken()`, que llama el repositorio de sesión |
+| Ningún campo público se puede modificar desde afuera | **Se corrigió**: `ApiClient.token` era público y cualquiera podía cambiarlo. Ahora es privado y solo se cambia con `usarToken()`. Desde el 07-11 lo llama un observador de `SesionRepository.cambios` (en `config/dependencias.dart`) |
 | Las listas que salen de un ViewModel no se pueden modificar | Cumple (`List.unmodifiable`) |
 | Estado de la vista vs. estado de la app | Mostrar u ocultar la contraseña es estado **de la vista** (no cambia ningún dato), por eso vive en el `State` de `CampoClave` y no en un ViewModel |
 
@@ -86,13 +89,13 @@ propósito: muchos son personas mayores y un registro sería una traba.
 | Conjunto | Pruebas | Resultado |
 |---|---|---|
 | Backend (`cd backend && npm test`) | **34**: cuentas, huella de la contraseña, límite de intentos, recuperación (código correcto, equivocado, vencido por intentos, un solo uso, email inexistente), dirección desde el mapa con caché, catálogo, pagos, webhook, reparto | **34/34 pasan** |
-| App (`flutter test`) | **90** (antes 67): +7 recuperación, +8 mapa → dirección (incluye toques rápidos, caché, sin calle, GPS sin permiso), +5 carrito guardado, +1 sesión con email, +2 pantallas (el ojo y la recuperación completa de punta a punta) | Hay que correrlas en la PC: el entorno donde se escribió este cambio no tiene acceso al SDK de Flutter |
+| App (`flutter test`) | **90** (antes 67): +7 recuperación, +8 mapa → dirección (incluye toques rápidos, caché, sin calle, GPS sin permiso), +5 carrito guardado, +1 sesión con email, +2 pantallas (el ojo y la recuperación completa de punta a punta) | **90/90 pasan** (corridas el 07-11 en la PC de Ignacio; `flutter analyze` sin problemas). Con los cambios del 07-11 son más: ver `INFORME_CAMBIOS_07-11.md` |
 
 Comandos para validar antes de entregar:
 
 ```bash
 flutter pub get
-dart format .
+dart format lib test
 flutter analyze
 flutter test
 cd backend && npm install && npm test
@@ -102,10 +105,10 @@ cd backend && npm install && npm test
 
 | Pendiente | Por qué | Prioridad |
 |---|---|---|
-| Correr `flutter analyze` y `flutter test` con estos cambios | No se pudieron ejecutar donde se escribió el código | Alta |
+| ~~Correr `flutter analyze` y `flutter test` con estos cambios~~ | Hecho el 07-11: todo pasa | — |
 | Configurar un correo real (`SMTP_URL`) | Sin eso, el código de recuperación aparece en la consola del servidor | Alta |
 | GPS del repartidor en segundo plano | Ver sección 2 (servicio en primer plano y permisos) | Alta |
-| Notificaciones push | Avisar "tu pedido está en camino" con la app cerrada | Media |
+| ~~Notificaciones push~~ | Hecho el 07-11 (falta cargar el proyecto de Firebase: `docs/NOTIFICACIONES.md`) | — |
 | Hosting con https y base de datos administrada | Para producción y para el webhook de Mercado Pago | Media |
 | Proveedor de mapas pago si crece el uso | Nominatim permite 1 consulta por segundo; la caché en la base lo alivia | Baja |
 | Pantalla para que el dueño cree cuentas de repartidores | Hoy se crean desde el `.env` del servidor | Baja |

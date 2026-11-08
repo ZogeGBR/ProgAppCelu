@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/carrito_repository.dart';
+import '../../../data/repositories/pago_repository.dart';
 import '../../../domain/models/item_carrito.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/pedido.dart';
@@ -13,15 +16,25 @@ import '../../../domain/models/producto.dart';
 ///
 /// Con [repositorio], el carrito se guarda en el celular: si la app se
 /// cierra, al volver a abrirla sigue ahí.
+///
+/// Con [pagos], observa los pedidos confirmados (patrón Observer) y se
+/// vacía solo cuando se aprueba el pago. Si el pago falla, no se toca:
+/// la persona no pierde lo que había elegido.
 class CarritoViewModel extends ChangeNotifier {
-  CarritoViewModel({DateTime Function()? reloj, CarritoRepository? repositorio})
-      : _reloj = reloj ?? DateTime.now,
-        _repositorio = repositorio;
+  CarritoViewModel({
+    DateTime Function()? reloj,
+    CarritoRepository? repositorio,
+    PagoRepository? pagos,
+  })  : _reloj = reloj ?? DateTime.now,
+        _repositorio = repositorio {
+    _suscripcion = pagos?.pedidosConfirmados.listen((_) => vaciarCarrito());
+  }
 
   static const primerNumeroDePedido = 1001;
 
   final DateTime Function() _reloj;
   final CarritoRepository? _repositorio;
+  late final StreamSubscription<Pedido>? _suscripcion;
   final List<ItemCarrito> _items = [];
   int _proximoNumero = primerNumeroDePedido;
 
@@ -120,4 +133,10 @@ class CarritoViewModel extends ChangeNotifier {
 
   int _indiceDe(Producto producto) =>
       _items.indexWhere((item) => item.producto.id == producto.id);
+
+  @override
+  void dispose() {
+    unawaited(_suscripcion?.cancel());
+    super.dispose();
+  }
 }

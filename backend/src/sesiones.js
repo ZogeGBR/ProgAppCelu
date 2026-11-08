@@ -40,6 +40,7 @@ export function exigirRol(secreto, ...roles) {
     const rol = rolDeToken(token, secreto);
     if (!rol) return res.status(401).json({ error: 'Hay que ingresar con la clave.' });
     if (!roles.includes(rol)) return res.status(403).json({ error: 'No tenés permiso.' });
+    req.rol = rol;
     return next();
   };
 }

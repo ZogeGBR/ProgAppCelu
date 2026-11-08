@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/estado_pedido.dart';
+import '../../avisos/view_models/avisos_view_model.dart';
 import '../../core/formato.dart';
 import '../../core/widgets/vista_mensaje.dart';
 import '../../pago/widgets/metodo_pago_ui.dart';
@@ -14,15 +15,21 @@ class SeguimientoScreen extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.alIrAComprar,
+    this.avisos,
   });
 
   final SeguimientoViewModel viewModel;
   final VoidCallback alIrAComprar;
 
+  /// Para mostrar "Activá las notificaciones" si la persona no las dejó.
+  final AvisosViewModel? avisos;
+
   @override
   Widget build(BuildContext context) {
+    final avisos = this.avisos;
     return ListenableBuilder(
-      listenable: viewModel,
+      // Observa a los dos: el pedido y el permiso de las notificaciones.
+      listenable: Listenable.merge([viewModel, if (avisos != null) avisos]),
       builder: (context, _) {
         final pedido = viewModel.pedido;
         if (pedido == null) {
@@ -48,6 +55,10 @@ class SeguimientoScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               if (viewModel.sinConexion) const _AvisoSinConexion(),
+              if (avisos != null &&
+                  avisos.permisoDenegado &&
+                  !viewModel.entregado)
+                _ActivarAvisos(alActivar: avisos.pedirPermiso),
               _EtapaActual(estado: viewModel.estado),
               if (viewModel.mostrarMapa && posicion != null) ...[
                 const SizedBox(height: 16),
@@ -274,6 +285,33 @@ class _FilaResumen extends StatelessWidget {
           Text(etiqueta, style: estilo),
           Text(valor, style: estilo),
         ],
+      ),
+    );
+  }
+}
+
+/// Sin permiso, la persona no se entera cuando sale su pedido si cierra la
+/// app. Se le explica para qué sirve y se le ofrece activarlo.
+class _ActivarAvisos extends StatelessWidget {
+  const _ActivarAvisos({required this.alActivar});
+
+  final Future<void> Function() alActivar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ListTile(
+        leading: const Icon(Icons.notifications_off_outlined),
+        title: const Text('Activá las notificaciones'),
+        subtitle: const Text(
+          'Así te avisamos cuando tu pedido sale y cuando llega, '
+          'aunque cierres la app.',
+        ),
+        trailing: TextButton(
+          onPressed: alActivar,
+          child: const Text('Activar'),
+        ),
       ),
     );
   }

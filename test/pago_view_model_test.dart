@@ -28,15 +28,17 @@ void main() {
     service = PagoServiceFalso(respuestas: respuestas, numero: numero);
     checkout = CheckoutFalso(seAbre: seAbre);
     aprobado = null;
+    final repositorio = PagoRepository(
+      service: service,
+      checkout: checkout,
+      intervaloConsulta: intervalo,
+      limiteEspera: limite,
+    );
+    // Observer: el repositorio publica el pedido confirmado.
+    repositorio.pedidosConfirmados.listen((pedido) => aprobado = pedido);
     viewModel = PagoViewModel(
-      repositorio: PagoRepository(
-        service: service,
-        checkout: checkout,
-        intervaloConsulta: intervalo,
-        limiteEspera: limite,
-      ),
+      repositorio: repositorio,
       armarPedido: carrito.armarPedido,
-      alAprobar: (pedido) => aprobado = pedido,
     );
     if (conDireccion) viewModel.cambiarDireccion('San Martín 1234');
   }

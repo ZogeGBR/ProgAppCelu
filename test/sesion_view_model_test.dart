@@ -13,12 +13,10 @@ void main() {
   setUp(() {
     token = null;
     service = SesionServiceFalso();
-    viewModel = SesionViewModel(
-      repositorio: SesionRepository(
-        service: service,
-        alCambiarToken: (nuevo) => token = nuevo,
-      ),
-    );
+    final repositorio = SesionRepository(service: service);
+    // Igual que el ApiClient en la app: observa la sesión y usa su token.
+    repositorio.cambios.listen((sesion) => token = sesion?.token);
+    viewModel = SesionViewModel(repositorio: repositorio);
   });
 
   tearDown(() => viewModel.dispose());

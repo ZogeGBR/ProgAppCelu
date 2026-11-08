@@ -14,15 +14,18 @@ void main() {
   late EscanerViewModel viewModel;
   late int avisosDeGuardado;
 
-  setUp(() {
+  setUp(() async {
     camara = CamaraFalsa(foto: Uint8List.fromList([1, 2, 3]));
     etiquetado = EtiquetadoServiceFalso();
     catalogo = CatalogoServiceFalso();
     avisosDeGuardado = 0;
+    final repositorio = CatalogoRepository(service: catalogo);
+    await repositorio.obtenerProductos();
+    // Observer: cuenta cuántas veces el catálogo avisó que cambió.
+    repositorio.cambios.listen((_) => avisosDeGuardado++);
     viewModel = EscanerViewModel(
       etiquetado: EtiquetadoRepository(camara: camara, etiquetado: etiquetado),
-      catalogo: CatalogoRepository(service: catalogo),
-      alGuardar: () => avisosDeGuardado++,
+      catalogo: repositorio,
     );
   });
 

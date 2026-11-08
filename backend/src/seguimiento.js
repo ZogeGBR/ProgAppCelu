@@ -4,6 +4,7 @@
 // En la demo, mientras no mande nada, se simula el recorrido. Con pagos reales
 // la simulación se apaga: un cliente nunca tiene que ver un repartidor inventado.
 import { obtenerBd } from './bd.js';
+import { anunciar, EVENTOS } from './eventos.js';
 import { buscarPedido } from './pagos.js';
 
 const ALMACEN = { lat: -32.8895, lng: -68.8458 };
@@ -25,22 +26,30 @@ export function registrarPosicion({ pedidoId, lat, lng, nombre }) {
   const valida =
     Number.isFinite(latitud) && Math.abs(latitud) <= 90 &&
     Number.isFinite(longitud) && Math.abs(longitud) <= 180;
-  if (!valida || !buscarPedido(pedidoId)) return false;
+  const pedido = buscarPedido(pedidoId);
+  if (!valida || !pedido) return false;
 
+  const primeraVez = !obtenerBd()
+    .prepare('SELECT 1 FROM posiciones WHERE pedido_id = ?')
+    .get(pedido.id);
   obtenerBd()
     .prepare(
       `INSERT INTO posiciones (pedido_id, lat, lng, nombre, en) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (pedido_id) DO UPDATE SET
          lat = excluded.lat, lng = excluded.lng, nombre = excluded.nombre, en = excluded.en`,
     )
-    .run(pedidoId, latitud, longitud, String(nombre ?? 'Repartidor').slice(0, 40), Date.now());
+    .run(pedido.id, latitud, longitud, String(nombre ?? 'Repartidor').slice(0, 40), Date.now());
+  // La primera posición quiere decir que el repartidor salió.
+  if (primeraVez) anunciar(EVENTOS.repartoEmpezado, pedido);
   return true;
 }
 
 export function marcarEntregado(pedidoId) {
   const registro = buscarPedido(pedidoId);
   if (!registro || registro.estadoPago !== 'aprobado') return false;
-  obtenerBd().prepare('UPDATE pedidos SET entregado = 1 WHERE id = ?').run(pedidoId);
+  if (registro.entregado) return true;
+  obtenerBd().prepare('UPDATE pedidos SET entregado = 1 WHERE id = ?').run(registro.id);
+  anunciar(EVENTOS.pedidoEntregado, registro);
   return true;
 }
 

@@ -51,8 +51,8 @@ void main() {
     );
 
     expect(viewModel.paso, PasoRecuperacion.lista);
-    expect(await repositorio.ingresar('ceferino@x.com', 'nueva-clave'),
-        isNotNull);
+    expect(
+        await repositorio.ingresar('ceferino@x.com', 'nueva-clave'), isNotNull);
   });
 
   test('valida antes de molestar al servidor', () async {

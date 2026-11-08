@@ -6,16 +6,20 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:freshmarket_app/data/services/avisos_service.dart';
 import 'package:freshmarket_app/data/services/camara_service.dart';
 import 'package:freshmarket_app/data/services/catalogo_service.dart';
 import 'package:freshmarket_app/data/services/etiquetado_service.dart';
 import 'package:freshmarket_app/data/services/geocodificacion_service.dart';
+import 'package:freshmarket_app/data/services/notificacion_local_service.dart';
+import 'package:freshmarket_app/data/services/push_service.dart';
 import 'package:freshmarket_app/data/services/api_client.dart';
 import 'package:freshmarket_app/data/services/pago_service.dart';
 import 'package:freshmarket_app/data/services/reparto_service.dart';
 import 'package:freshmarket_app/data/services/seguimiento_service.dart';
 import 'package:freshmarket_app/data/services/sesion_service.dart';
 import 'package:freshmarket_app/data/services/ubicacion_service.dart';
+import 'package:freshmarket_app/domain/models/aviso.dart';
 import 'package:freshmarket_app/domain/models/posicion.dart';
 import 'package:freshmarket_app/domain/models/producto.dart';
 
@@ -128,6 +132,9 @@ class SesionServiceFalso implements SesionService {
 
 class RepartoServiceFalso implements RepartoService {
   bool falla = false;
+
+  /// Cuántas veces se pidió la lista de pedidos.
+  int consultas = 0;
   final posiciones = <Map<String, dynamic>>[];
   final entregados = <String>[];
   final pedidos = <Map<String, dynamic>>[
@@ -144,6 +151,7 @@ class RepartoServiceFalso implements RepartoService {
 
   @override
   Future<List<Map<String, dynamic>>> obtenerPedidos() async {
+    consultas++;
     if (falla) throw Exception('sin conexión');
     return List.of(pedidos);
   }
@@ -295,5 +303,88 @@ class CheckoutFalso implements CheckoutLauncher {
   Future<bool> abrir(Uri url) async {
     abiertos.add(url);
     return seAbre;
+  }
+}
+
+// --- Notificaciones ---
+
+/// Hace de Firebase: [enviar] simula un push que llega con la app abierta
+/// y [tocar] simula que la persona tocó una notificación.
+class PushFalso implements PushService {
+  PushFalso({this.token = 'token-de-prueba-1'});
+
+  String? token;
+  int pedidosDeToken = 0;
+  final _recibidos = StreamController<Aviso>.broadcast(sync: true);
+  final _tocados = StreamController<Aviso>.broadcast(sync: true);
+
+  void enviar(Aviso aviso) => _recibidos.add(aviso);
+  void tocar(Aviso aviso) => _tocados.add(aviso);
+
+  @override
+  Future<String?> obtenerToken() async {
+    pedidosDeToken++;
+    return token;
+  }
+
+  @override
+  Stream<Aviso> get recibidos => _recibidos.stream;
+
+  @override
+  Stream<Aviso> get tocados => _tocados.stream;
+}
+
+/// Guarda lo que se habría mostrado en la barra del celular.
+class NotificacionLocalFalsa implements NotificacionLocalService {
+  NotificacionLocalFalsa({this.concedePermiso = true});
+
+  bool concedePermiso;
+  bool iniciada = false;
+  int pedidosDePermiso = 0;
+  final mostradas = <Aviso>[];
+  final _tocadas = StreamController<Aviso>.broadcast(sync: true);
+
+  void tocar(Aviso aviso) => _tocadas.add(aviso);
+
+  @override
+  Future<void> iniciar() async => iniciada = true;
+
+  @override
+  Future<bool> pedirPermiso() async {
+    pedidosDePermiso++;
+    return concedePermiso;
+  }
+
+  @override
+  Future<void> mostrar(Aviso aviso) async => mostradas.add(aviso);
+
+  @override
+  Stream<Aviso> get tocadas => _tocadas.stream;
+}
+
+/// Anota lo que la app le pidió al backend. Con [falla], tira error como
+/// si no hubiera conexión.
+class AvisosServiceFalso implements AvisosService {
+  bool falla = false;
+  final pedidos = <String>[];
+  final cuentas = <String>[];
+  final olvidadas = <String>[];
+
+  @override
+  Future<void> anotarParaPedido(String pedidoId, String token) async {
+    if (falla) throw const ApiException(0, 'sin conexión');
+    pedidos.add(pedidoId);
+  }
+
+  @override
+  Future<void> anotarCuenta(String token) async {
+    if (falla) throw const ApiException(0, 'sin conexión');
+    cuentas.add(token);
+  }
+
+  @override
+  Future<void> olvidarCuenta(String token) async {
+    if (falla) throw const ApiException(0, 'sin conexión');
+    olvidadas.add(token);
   }
 }

@@ -15,10 +15,8 @@ void main() {
     service = CatalogoServiceFalso();
     final repositorio = CatalogoRepository(service: service);
     catalogo = CatalogoViewModel(repositorio: repositorio);
-    viewModel = AlmacenViewModel(
-      repositorio: repositorio,
-      alCambiarCatalogo: catalogo.cargar,
-    );
+    // No se conocen: los dos observan al mismo repositorio.
+    viewModel = AlmacenViewModel(repositorio: repositorio);
     await catalogo.cargar();
     await viewModel.cargar();
   });

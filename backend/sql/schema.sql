@@ -100,3 +100,21 @@ CREATE TABLE IF NOT EXISTS direcciones_cache (
   direccion  TEXT    NOT NULL,
   creado_en  INTEGER NOT NULL
 );
+
+-- ---------------------------------------------------------------------
+-- Celulares que reciben notificaciones push (token de Firebase).
+-- Un cliente (sin cuenta) se anota para UN pedido; el dueño y el
+-- repartidor se anotan por su rol al ingresar. Exactamente uno de los dos.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dispositivos (
+  token      TEXT    NOT NULL CHECK (length(token) BETWEEN 10 AND 4096),
+  pedido_id  TEXT    REFERENCES pedidos (id) ON DELETE CASCADE,
+  rol        TEXT    CHECK (rol IN ('dueno', 'repartidor')),
+  creado_en  INTEGER NOT NULL,
+  CHECK ((pedido_id IS NULL) <> (rol IS NULL))
+);
+
+-- Un mismo celular no se anota dos veces para lo mismo.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dispositivos_unico
+  ON dispositivos (token, ifnull(pedido_id, ''), ifnull(rol, ''));
+CREATE INDEX IF NOT EXISTS idx_dispositivos_pedido ON dispositivos (pedido_id);

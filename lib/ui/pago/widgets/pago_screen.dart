@@ -185,7 +185,9 @@ class _DireccionState extends State<_Direccion> {
           onPressed: _marcarEnMapa,
           icon: Icon(marcada ? Icons.check_circle : Icons.map_outlined),
           label: Text(
-            marcada ? 'Cambiar el lugar en el mapa' : 'Marcar mi casa en el mapa',
+            marcada
+                ? 'Cambiar el lugar en el mapa'
+                : 'Marcar mi casa en el mapa',
           ),
         ),
       ],

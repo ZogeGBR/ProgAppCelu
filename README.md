@@ -14,11 +14,23 @@ Además: cuentas con email y contraseña (con el **ojo** para ver lo que se
 escribe y **recuperación por código**), **dirección automática** al tocar el
 mapa y carrito guardado en el celular.
 
+**07-11:** **notificaciones push** con Firebase ("tu pedido está en camino",
+"llegó", "nuevo pedido"), **Observer también entre ViewModels y
+repositorios** (ya no se llaman entre sí con callbacks), revisión del código y
+APK para probar en un celular real.
+
 - Qué se mejoró y qué falta: [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
 - Teoría de la materia y patrones (dónde se usa cada uno y por qué no los
   otros): [`INFORME_TEORIA_Y_PATRONES.md`](INFORME_TEORIA_Y_PATRONES.md).
 - Diagramas de capas, de clases y de la base de datos:
   [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+- **Qué se cambió el 07-11, por qué y cómo** (después de mostrarle la app a
+  la profesora): [`INFORME_CAMBIOS_07-11.md`](INFORME_CAMBIOS_07-11.md).
+- Guía para el oral (cada patrón explicado con el código):
+  [`docs/GUIA_PATRONES.md`](docs/GUIA_PATRONES.md).
+- Notificaciones push y cómo configurar Firebase:
+  [`docs/NOTIFICACIONES.md`](docs/NOTIFICACIONES.md).
+- Instalar la app en un celular real: [`docs/CELULAR_REAL.md`](docs/CELULAR_REAL.md).
 
 ## Cómo correrlo
 
@@ -69,6 +81,7 @@ flutter run --dart-define=URL_BACKEND=http://10.0.2.2:3000
 | `SECRETO_SESION` | Firmar las sesiones | Se genera al arrancar: hay que volver a ingresar en cada reinicio |
 | `SIMULAR_REPARTO` | `true` o `false`: simular al repartidor mientras no mande su GPS | Se simula solo si Mercado Pago también está simulado |
 | `RUTA_BD` | Archivo de la base de datos (SQLite) | `freshmarket.db` |
+| `FIREBASE_CREDENCIALES` | Ruta al JSON de la cuenta de servicio de Firebase, para mandar notificaciones push (ver `docs/NOTIFICACIONES.md`). **Secreto** | Los avisos se escriben en la consola del servidor |
 
 Hace falta **Node 22.13 o más nuevo**, que ya trae SQLite. El esquema de la
 base está en [`backend/sql/schema.sql`](backend/sql/schema.sql) y los datos
@@ -84,8 +97,8 @@ sola al arrancar, o a mano con `cd backend && npm run bd:crear`.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 90 pruebas (ViewModels con fakes y pantallas)
-cd backend && npm test # backend: 34 pruebas
+flutter test           # app: 122 pruebas (ViewModels con fakes, Observer, avisos y pantallas)
+cd backend && npm test # backend: 44 pruebas (34 + 10 de notificaciones)
 node scripts/carga.mjs 500   # (desde backend/) prueba de carga
 ```
 
@@ -118,8 +131,12 @@ lib/
 │   │   ├── carrito_local_service.dart   (carrito guardado en el celular)
 │   │   ├── reparto_service.dart     (pedidos y posición del repartidor)
 │   │   ├── ubicacion_service.dart   (GPS con geolocator)
-│   │   └── camara_service.dart      (image_picker)
-│   └── repositories/            ← JSON → modelo, caché, reintentos, esperas
+│   │   ├── camara_service.dart      (image_picker)
+│   │   ├── push_service.dart        (Firebase Cloud Messaging / simulado)
+│   │   ├── notificacion_local_service.dart (mostrar el aviso en la barra)
+│   │   └── avisos_service.dart      (qué avisos pide este celular al backend)
+│   └── repositories/            ← JSON → modelo, caché, reintentos, esperas;
+│                                   publican sus cambios en un Stream (Observer)
 └── ui/
     ├── core/                    ← tema accesible, formato de precios, VistaMensaje, CampoClave
     ├── inicio/                  ← barra de abajo (NavegacionViewModel)
@@ -130,19 +147,21 @@ lib/
     ├── escaner/                 ← producto nuevo con una foto
     ├── sesion/                  ← ingreso y "¿Olvidaste tu contraseña?"
     ├── almacen/                 ← "Mi almacén": precios, sin stock, borrar
-    └── reparto/                 ← "Repartir": pedidos y envío del GPS
-backend/                         ← Node + Express + SQLite (pagos, IA, reparto, cuentas, mapa)
+    ├── reparto/                 ← "Repartir": pedidos y envío del GPS
+    └── avisos/                  ← AvisosViewModel (notificaciones)
+backend/                         ← Node + Express + SQLite (pagos, IA, reparto, cuentas, mapa, push)
 ├── sql/                         ← schema.sql y seed.sql
-docs/                            ← ARQUITECTURA.md y diagramas
+docs/                            ← ARQUITECTURA, NOTIFICACIONES, GUIA_PATRONES, CELULAR_REAL y diagramas
 test/                            ← pruebas con fakes (sin internet)
 ```
 
 ```
 Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
-      ▲  escucha (ListenableBuilder)        │
-      └─────────────────────────────────────┘
-                                            ▼
-                                     Repositorio  (caché, reintento, conversión)
+      ▲  escucha (ListenableBuilder)     │  ▲
+      └──────────────────────────────────┘  │ escucha (Stream: Observer)
+                                         ▼  │
+                                     Repositorio  (caché, reintento, conversión;
+                                            │       publica sus cambios)
                                             ▼
                                        Servicio    (red, cámara; sin estado)
                                             ▼
@@ -164,6 +183,9 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
 - **Capas:** las vistas no hablan con la red; los ViewModels importan solo
   `foundation.dart`; los servicios no guardan estado; los repositorios no
   dependen entre sí. Las dependencias se reciben por el constructor.
+- **Comunicación:** ningún ViewModel llama a otro. Si a uno le interesa lo
+  que cambió otro, observa al **repositorio** (se suscribe en el constructor
+  y cancela en `dispose()`).
 - **Verbos:** `cargar`, `agregar`, `quitar`, `eliminar`, `vaciar`, `armar`,
   `pagar`, `seguir`. Consultas con sustantivo (`total`, `cantidadDe`).
 - **Async:** toda espera muestra carga, maneja el error con "Reintentar" y
@@ -180,6 +202,7 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
 | Ver el catálogo con precio del día | `ui/catalogo` + `CatalogoRepository` (backend o local); el dueño lo cambia en `ui/almacen` |
 | Pagar "con tarjeta o Mercado Pago" | `ui/pago` + `PagoRepository` + `backend/src/pagos.js` (Checkout Pro) |
 | Ver el reparto "como el GPS de un taxi" | `ui/seguimiento/widgets/mapa_repartidor.dart` + `backend/src/seguimiento.js` |
+| "Saber en todo momento en qué estado está el pedido" (también con la app cerrada) | Notificaciones push: `NotificacionesRepository` + `backend/src/avisos.js` (`docs/NOTIFICACIONES.md`) |
 | Cargar productos sin saber de tecnología | `ui/escaner` + `backend/src/ia.js` (foto → etiqueta) |
 | Que sea fácil para clientes mayores | `ui/inicio` (barra de 3 botones) + `ui/core/tema.dart` |
 | 5.000 pedidos simultáneos en Nochebuena, sin pagar servidores | **Incompatibles.** Con la profesora acordamos un pico realista de hasta 500: ver `INFORME_MEJORAS.md`, secciones "Pruebas" y "Qué faltaría" |

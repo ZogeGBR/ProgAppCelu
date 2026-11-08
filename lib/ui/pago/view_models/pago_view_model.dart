@@ -21,21 +21,19 @@ enum PasoPago {
 
 /// Estado de la pantalla de pago.
 ///
-/// No conoce al carrito ni al seguimiento: recibe dos callbacks
-/// (patrón de callbacks) para armar el pedido y para avisar que se
-/// aprobó. Quien crea la pantalla decide qué hacer en cada caso.
+/// No conoce al carrito ni al seguimiento. Recibe un callback para armar
+/// el pedido (patrón de callbacks) y, cuando el pago se aprueba, el
+/// [PagoRepository] lo publica: el carrito y "Mi pedido" lo observan
+/// (patrón Observer).
 class PagoViewModel extends ChangeNotifier {
   PagoViewModel({
     required PagoRepository repositorio,
     required Pedido Function(MetodoPago metodo) armarPedido,
-    required void Function(Pedido pedido) alAprobar,
   })  : _repositorio = repositorio,
-        _armarPedido = armarPedido,
-        _alAprobar = alAprobar;
+        _armarPedido = armarPedido;
 
   final PagoRepository _repositorio;
   final Pedido Function(MetodoPago metodo) _armarPedido;
-  final void Function(Pedido pedido) _alAprobar;
 
   MetodoPago? _metodo;
   String _direccion = '';
@@ -101,14 +99,14 @@ class PagoViewModel extends ChangeNotifier {
     _pedido = pedido;
 
     // En efectivo no hay nada que confirmar: se paga al recibir.
+    // El repositorio ya lo publicó como confirmado.
     if (metodo == MetodoPago.efectivo) {
-      _alAprobar(pedido);
       _cambiarPaso(PasoPago.aprobado);
       return;
     }
 
     _cambiarPaso(PasoPago.esperandoConfirmacion);
-    _suscripcion = _repositorio.seguirEstado(pedido.id).listen(
+    _suscripcion = _repositorio.seguirEstado(pedido).listen(
           _alRecibirResultado,
           // Una consulta que falla no define nada: se sigue esperando.
           onError: (Object _) {},
@@ -126,7 +124,6 @@ class PagoViewModel extends ChangeNotifier {
     if (resultado == ResultadoPago.pendiente) return;
     _cancelarEspera();
     if (resultado == ResultadoPago.aprobado) {
-      _alAprobar(_pedido!);
       _cambiarPaso(PasoPago.aprobado);
     } else {
       _cambiarPaso(PasoPago.rechazado);
