@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/config/dependencias.dart';
 import 'package:freshmarket_app/data/services/carrito_local_service.dart';
+import 'package:freshmarket_app/data/services/pedido_local_service.dart';
 import 'package:freshmarket_app/data/services/sesion_service.dart';
 import 'package:freshmarket_app/domain/models/aviso.dart';
 import 'package:freshmarket_app/main.dart';
@@ -23,6 +24,7 @@ void main() {
       camara: CamaraFalsa(),
       pagoService: PagoServiceFalso(),
       carritoLocalService: CarritoLocalServiceMemoria(),
+      pedidoLocalService: PedidoLocalServiceMemoria(),
       geocodificacionService: GeocodificacionFalsa(),
       ubicacionService: UbicacionFalsa(),
       // Sin el plugin real: en las pruebas no hay barra de notificaciones.

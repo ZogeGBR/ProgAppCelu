@@ -16,6 +16,7 @@ import '../data/services/etiquetado_service.dart';
 import '../data/services/geocodificacion_service.dart';
 import '../data/services/notificacion_local_service.dart';
 import '../data/services/pago_service.dart';
+import '../data/services/pedido_local_service.dart';
 import '../data/services/push_service.dart';
 import '../data/services/reparto_service.dart';
 import '../data/services/seguimiento_service.dart';
@@ -70,7 +71,10 @@ class Dependencias {
     sesion.cambios.listen((actual) => api.usarToken(actual?.token));
     return Dependencias(
       catalogo: catalogo,
-      seguimiento: SeguimientoRepository(service: SeguimientoServiceHttp(api)),
+      seguimiento: SeguimientoRepository(
+        service: SeguimientoServiceHttp(api),
+        guardado: const PedidoLocalServicePreferencias(),
+      ),
       etiquetado: EtiquetadoRepository(
         camara: CamaraServiceImagePicker(),
         etiquetado: EtiquetadoServiceHttp(api),
@@ -115,6 +119,7 @@ class Dependencias {
     RepartoService? repartoService,
     UbicacionService? ubicacionService,
     CarritoLocalService? carritoLocalService,
+    PedidoLocalService? pedidoLocalService,
     GeocodificacionService? geocodificacionService,
     NotificacionLocalService? notificacionLocal,
     PushService? push,
@@ -129,6 +134,7 @@ class Dependencias {
       seguimiento: SeguimientoRepository(
         service:
             seguimientoService ?? SeguimientoServiceSimulado(push: pushDemo),
+        guardado: pedidoLocalService ?? const PedidoLocalServicePreferencias(),
       ),
       etiquetado: EtiquetadoRepository(
         camara: camara ?? CamaraServiceImagePicker(),

@@ -82,11 +82,18 @@ llega, "manda" el aviso por ese push simulado, y la app lo muestra en la
 barra igual que un push real. Así se puede mostrar en clase sin configurar
 nada.
 
-## 4. Configurar Firebase (una vez, ~10 minutos)
+## 4. Configurar Firebase
 
-Sin estos pasos la app **compila y anda igual**, solo que sin push del
-backend (el plugin de Google Services se aplica únicamente si existe
-`android/app/google-services.json`).
+**Ya está hecho** (07-11): proyecto **`freshmarket-itu-2026`** ("FreshMarket",
+cuenta de Ignacio), app Android `com.freshmarket.freshmarket_app` y
+`android/app/google-services.json` en el repo. Lo único que **no** está en el
+repo es la clave del servidor: pedírsela a Ignacio y guardarla como
+`backend/firebase-credenciales.json`, o hacer el paso 4 de abajo (cualquiera
+con acceso al proyecto puede generar otra).
+
+Si hubiera que armarlo de cero en otro proyecto (sin estos pasos la app
+**compila y anda igual**, solo que sin push del backend: el plugin de Google
+Services se aplica únicamente si existe `android/app/google-services.json`):
 
 1. Entrar a <https://console.firebase.google.com> → **Agregar proyecto** →
    nombre `freshmarket` (Google Analytics no hace falta).
@@ -111,11 +118,15 @@ cd backend && node --test test/avisos.test.js # quién recibe qué y cuándo
 
 **A mano, en el celular:**
 
+Así se probó el 07-11 en el emulador, con el push real (ver
+`INFORME_CAMBIOS_07-11.md`, sección 6):
+
 1. Comprar algo en efectivo → en el celular del dueño (con sesión) llega
    "Nuevo pedido".
 2. Con la app del cliente **cerrada**, el repartidor toca "Salir a repartir" en ese
    pedido → al cliente le llega "Tu pedido está en camino".
-3. Tocar la notificación → se abre "Mi pedido" con el mapa.
+3. Tocar la notificación → se abre "Mi pedido" con el mapa (aunque la app
+   estuviera cerrada: el pedido en curso queda guardado en el celular).
 4. El repartidor toca "Ya lo entregué" → "Tu pedido llegó" reemplaza al aviso
    anterior.
 5. Negar el permiso (Ajustes → Apps → FreshMarket → Notificaciones) →

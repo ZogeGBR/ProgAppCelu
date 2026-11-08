@@ -19,6 +19,24 @@ class Pedido {
     this.destino,
   });
 
+  /// Lee un pedido guardado en el celular con [toJsonLocal].
+  factory Pedido.fromJsonLocal(Map<String, dynamic> json) {
+    final destino = json['destino'] as Map<String, dynamic>?;
+    return Pedido(
+      id: json['id'] as String,
+      numero: json['numero'] as int,
+      items: List.unmodifiable(
+        (json['items'] as List<dynamic>).map(
+          (item) => ItemCarrito.fromJsonLocal(item as Map<String, dynamic>),
+        ),
+      ),
+      metodoPago: MetodoPago.values.byName(json['metodoPago'] as String),
+      fecha: DateTime.parse(json['fecha'] as String),
+      direccion: json['direccion'] as String? ?? '',
+      destino: destino == null ? null : Posicion.fromJson(destino),
+    );
+  }
+
   final String id;
   final int numero;
   final List<ItemCarrito> items;
@@ -51,6 +69,19 @@ class Pedido {
         'id': id,
         'numero': numero,
         'items': [for (final item in items) item.toJson()],
+        'metodoPago': metodoPago.name,
+        'fecha': fecha.toIso8601String(),
+        'direccion': direccion,
+        if (destino != null) 'destino': destino!.toJson(),
+      };
+
+  /// Para guardarlo en el celular: a diferencia de [toJson] (que va al
+  /// backend), guarda el producto completo, para poder mostrar el resumen
+  /// del pedido sin internet.
+  Map<String, dynamic> toJsonLocal() => {
+        'id': id,
+        'numero': numero,
+        'items': [for (final item in items) item.toJsonLocal()],
         'metodoPago': metodoPago.name,
         'fecha': fecha.toIso8601String(),
         'direccion': direccion,

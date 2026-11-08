@@ -113,6 +113,8 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     );
     unawaited(_catalogo.cargar());
     unawaited(_carrito.restaurar());
+    // Si la app se cerró con un pedido en viaje, "Mi pedido" lo retoma.
+    unawaited(_seguimiento.restaurar());
     // Al tocar una notificación, la barra cambia de sección; acá se cierra
     // lo que haya encima para que esa sección se vea.
     _suscripcionAvisos =
