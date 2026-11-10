@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/estado_pedido.dart';
+import '../../../domain/models/item_carrito.dart';
 import '../../avisos/view_models/avisos_view_model.dart';
 import '../../core/formato.dart';
 import '../../core/widgets/vista_mensaje.dart';
 import '../../pago/widgets/metodo_pago_ui.dart';
+import '../view_models/historial_view_model.dart';
 import '../view_models/seguimiento_view_model.dart';
 import 'estado_pedido_ui.dart';
+import 'historial_de_pedidos.dart';
 import 'mapa_repartidor.dart';
 
 /// Sección "Mi pedido": etapa actual, mapa del repartidor y resumen.
@@ -16,10 +19,16 @@ class SeguimientoScreen extends StatelessWidget {
     required this.viewModel,
     required this.alIrAComprar,
     this.avisos,
+    this.historial,
+    this.alVolverAPedir,
   });
 
   final SeguimientoViewModel viewModel;
   final VoidCallback alIrAComprar;
+
+  /// Pedidos anteriores guardados en el celular (SQLite).
+  final HistorialViewModel? historial;
+  final void Function(List<ItemCarrito> items)? alVolverAPedir;
 
   /// Para mostrar "Activá las notificaciones" si la persona no las dejó.
   final AvisosViewModel? avisos;
@@ -33,15 +42,29 @@ class SeguimientoScreen extends StatelessWidget {
       builder: (context, _) {
         final pedido = viewModel.pedido;
         if (pedido == null) {
+          final historial = this.historial;
+          final alVolverAPedir = this.alVolverAPedir;
+          final sinPedido = VistaMensaje(
+            icono: Icons.receipt_long_outlined,
+            titulo: 'Todavía no hiciste ningún pedido.',
+            detalle: 'Cuando pagues, acá vas a ver por dónde va.',
+            textoBoton: 'Ir a comprar',
+            onBoton: alIrAComprar,
+          );
           return Scaffold(
             appBar: AppBar(title: const Text('Mi pedido')),
-            body: VistaMensaje(
-              icono: Icons.receipt_long_outlined,
-              titulo: 'Todavía no hiciste ningún pedido.',
-              detalle: 'Cuando pagues, acá vas a ver por dónde va.',
-              textoBoton: 'Ir a comprar',
-              onBoton: alIrAComprar,
-            ),
+            body: historial == null || alVolverAPedir == null
+                ? sinPedido
+                : ListenableBuilder(
+                    listenable: historial,
+                    builder: (context, _) => historial.hayPedidos
+                        ? HistorialDePedidos(
+                            pedidos: historial.pedidos,
+                            alVolverAPedir: alVolverAPedir,
+                            alIrAComprar: alIrAComprar,
+                          )
+                        : sinPedido,
+                  ),
           );
         }
 
