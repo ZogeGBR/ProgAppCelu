@@ -1,8 +1,12 @@
 import '../data/repositories/carrito_repository.dart';
 import '../data/repositories/catalogo_repository.dart';
+import '../data/repositories/conectividad_repository.dart';
 import '../data/repositories/etiquetado_repository.dart';
+import '../data/repositories/funciones_repository.dart';
+import '../data/repositories/historial_repository.dart';
 import '../data/repositories/notificaciones_repository.dart';
 import '../data/repositories/pago_repository.dart';
+import '../data/repositories/recordatorios_repository.dart';
 import '../data/repositories/reparto_repository.dart';
 import '../data/repositories/seguimiento_repository.dart';
 import '../data/repositories/sesion_repository.dart';
@@ -12,16 +16,21 @@ import '../data/services/avisos_service.dart';
 import '../data/services/camara_service.dart';
 import '../data/services/carrito_local_service.dart';
 import '../data/services/catalogo_service.dart';
+import '../data/services/conectividad_service.dart';
 import '../data/services/etiquetado_service.dart';
+import '../data/services/funciones_service.dart';
 import '../data/services/geocodificacion_service.dart';
+import '../data/services/historial_dao.dart';
 import '../data/services/notificacion_local_service.dart';
 import '../data/services/pago_service.dart';
 import '../data/services/pedido_local_service.dart';
 import '../data/services/push_service.dart';
+import '../data/services/recordatorio_service.dart';
 import '../data/services/reparto_service.dart';
 import '../data/services/seguimiento_service.dart';
 import '../data/services/sesion_service.dart';
 import '../data/services/ubicacion_service.dart';
+import '../domain/politicas/politicas.dart';
 
 /// Configuración que llega al compilar con `--dart-define`.
 ///
@@ -56,8 +65,19 @@ class Dependencias {
     required this.carrito,
     required this.ubicacionEntrega,
     required this.notificaciones,
+    required this.funciones,
+    required this.conectividad,
+    required this.recordatorios,
+    required this.historial,
     this.pistaClaves,
   });
+
+  /// SQLite en el celular; en Web (donde no existe) el historial vive en
+  /// memoria. La decisión la toma la política, no un `if` suelto.
+  static HistorialService _historialSegun(Politicas politicas) =>
+      politicas.puedeGuardarHistorial
+          ? HistorialDao()
+          : HistorialServiceMemoria();
 
   /// [hayFirebase]: si Firebase arrancó (ver main.dart). Sin Firebase la app
   /// anda igual, pero sin notificaciones push del backend.
@@ -104,6 +124,12 @@ class Dependencias {
         local: NotificacionLocalServicePlugin(),
         servidor: AvisosServiceHttp(api),
       ),
+      funciones: FuncionesRepository(service: FuncionesServiceHttp(api)),
+      conectividad:
+          ConectividadRepository(service: ConectividadServicePlus()),
+      recordatorios:
+          RecordatoriosRepository(service: RecordatorioServicePlugin()),
+      historial: HistorialRepository(service: _historialSegun(Politicas())),
     );
   }
 
@@ -123,6 +149,10 @@ class Dependencias {
     GeocodificacionService? geocodificacionService,
     NotificacionLocalService? notificacionLocal,
     PushService? push,
+    FuncionesService? funcionesService,
+    ConectividadService? conectividadService,
+    RecordatorioService? recordatorioService,
+    HistorialService? historialService,
     Duration intervaloPago = const Duration(seconds: 1),
   }) {
     // El "servidor" de la demo manda los avisos por este push simulado.
@@ -165,6 +195,18 @@ class Dependencias {
         local: notificacionLocal ?? NotificacionLocalServicePlugin(),
         servidor: const AvisosServiceSimulado(),
       ),
+      funciones: FuncionesRepository(
+        service: funcionesService ?? const FuncionesServiceSimulado(),
+      ),
+      conectividad: ConectividadRepository(
+        service: conectividadService ?? ConectividadServicePlus(),
+      ),
+      recordatorios: RecordatoriosRepository(
+        service: recordatorioService ?? RecordatorioServicePlugin(),
+      ),
+      historial: HistorialRepository(
+        service: historialService ?? _historialSegun(Politicas()),
+      ),
       pistaClaves: 'Demo: ${SesionServiceSimulado.emailDueno} o '
           '${SesionServiceSimulado.emailRepartidor}, contraseña '
           '"${SesionServiceSimulado.claveInicial}". Si la olvidás, el '
@@ -181,6 +223,10 @@ class Dependencias {
   final CarritoRepository carrito;
   final UbicacionEntregaRepository ubicacionEntrega;
   final NotificacionesRepository notificaciones;
+  final FuncionesRepository funciones;
+  final ConectividadRepository conectividad;
+  final RecordatoriosRepository recordatorios;
+  final HistorialRepository historial;
 
   /// Solo en la demo: qué cuentas se pueden usar para ingresar.
   final String? pistaClaves;

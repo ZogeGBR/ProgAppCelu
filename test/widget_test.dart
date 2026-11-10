@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/config/dependencias.dart';
 import 'package:freshmarket_app/data/services/carrito_local_service.dart';
+import 'package:freshmarket_app/data/services/conectividad_service.dart';
+import 'package:freshmarket_app/data/services/historial_dao.dart';
 import 'package:freshmarket_app/data/services/pedido_local_service.dart';
+import 'package:freshmarket_app/data/services/recordatorio_service.dart';
 import 'package:freshmarket_app/data/services/sesion_service.dart';
 import 'package:freshmarket_app/domain/models/aviso.dart';
 import 'package:freshmarket_app/main.dart';
@@ -30,6 +33,10 @@ void main() {
       // Sin el plugin real: en las pruebas no hay barra de notificaciones.
       notificacionLocal: local ?? NotificacionLocalFalsa(),
       push: push,
+      // Sin plugins en las pruebas: red, recordatorios y SQLite falsos.
+      conectividadService: ConectividadServiceSimulado(),
+      recordatorioService: RecordatorioServiceSimulado(),
+      historialService: HistorialServiceMemoria(),
     );
     await tester.pumpWidget(FreshMarketApp(dependencias: dependencias));
     await tester.pumpAndSettle();

@@ -76,10 +76,31 @@ class CarritoScreen extends StatelessWidget {
             separatorBuilder: (context, _) => const Divider(height: 1),
             itemBuilder: (context, indice) {
               final item = carrito.items[indice];
-              return _RenglonCarrito(
-                item: item,
-                onSumar: () => carrito.agregarProducto(item.producto),
-                onRestar: () => carrito.quitarProducto(item.producto),
+              // Gesto: deslizar el renglón lo saca entero. Es un atajo:
+              // el botón "−" hace lo mismo y "Deshacer" lo devuelve, por
+              // si se deslizó sin querer.
+              return Dismissible(
+                key: ValueKey(item.producto.id),
+                background: const _FondoQuitar(),
+                onDismissed: (_) {
+                  carrito.eliminarProducto(item.producto);
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text('Sacaste ${item.producto.nombre}.'),
+                        action: SnackBarAction(
+                          label: 'Deshacer',
+                          onPressed: () => carrito.agregarItems([item]),
+                        ),
+                      ),
+                    );
+                },
+                child: _RenglonCarrito(
+                  item: item,
+                  onSumar: () => carrito.agregarProducto(item.producto),
+                  onRestar: () => carrito.quitarProducto(item.producto),
+                ),
               );
             },
           ),
@@ -94,8 +115,34 @@ class CarritoScreen extends StatelessWidget {
   }
 }
 
+/// Lo que se ve detrás del renglón mientras se desliza.
+class _FondoQuitar extends StatelessWidget {
+  const _FondoQuitar();
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return Container(
+      color: colores.errorContainer,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            'Sacar',
+            style: TextStyle(fontSize: 18, color: colores.onErrorContainer),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.delete_outline, color: colores.onErrorContainer),
+        ],
+      ),
+    );
+  }
+}
+
 /// Un renglón del carrito. Se quita con el botón "−" (que en 1 se
-/// convierte en tacho): es más fácil de descubrir que deslizar.
+/// convierte en tacho) o deslizándolo.
 class _RenglonCarrito extends StatelessWidget {
   const _RenglonCarrito({
     required this.item,
