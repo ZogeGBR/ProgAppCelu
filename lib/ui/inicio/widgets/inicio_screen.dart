@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/repositories/pago_repository.dart';
-import '../../../data/repositories/sesion_repository.dart';
-import '../../../data/repositories/ubicacion_entrega_repository.dart';
+import '../../../domain/models/item_carrito.dart';
 import '../../almacen/view_models/almacen_view_model.dart';
 import '../../almacen/widgets/almacen_screen.dart';
 import '../../avisos/view_models/avisos_view_model.dart';
@@ -10,19 +8,16 @@ import '../../carrito/view_models/carrito_view_model.dart';
 import '../../carrito/widgets/carrito_screen.dart';
 import '../../catalogo/view_models/catalogo_view_model.dart';
 import '../../catalogo/widgets/catalogo_screen.dart';
-import '../../escaner/view_models/escaner_view_model.dart';
-import '../../escaner/widgets/escaner_screen.dart';
-import '../../pago/view_models/elegir_ubicacion_view_model.dart';
-import '../../pago/view_models/pago_view_model.dart';
-import '../../pago/widgets/pago_screen.dart';
+import '../../core/rutas.dart';
 import '../../reparto/view_models/reparto_view_model.dart';
 import '../../reparto/widgets/reparto_screen.dart';
+import '../../seguimiento/view_models/historial_view_model.dart';
 import '../../seguimiento/view_models/seguimiento_view_model.dart';
 import '../../seguimiento/widgets/seguimiento_screen.dart';
-import '../../sesion/view_models/recuperar_clave_view_model.dart';
 import '../../sesion/view_models/sesion_view_model.dart';
-import '../../sesion/widgets/ingresar_screen.dart';
+import '../view_models/conectividad_view_model.dart';
 import '../view_models/navegacion_view_model.dart';
+import 'aviso_sin_internet.dart';
 
 /// Pantalla principal con la barra de abajo.
 ///
@@ -37,30 +32,29 @@ class InicioScreen extends StatelessWidget {
     required this.catalogo,
     required this.carrito,
     required this.seguimiento,
-    required this.escaner,
     required this.sesion,
     required this.almacen,
     required this.reparto,
     this.avisos,
-    required this.pagoRepositorio,
-    required this.sesionRepositorio,
-    required this.ubicacionEntregaRepositorio,
-    this.pistaClaves,
+    this.conectividad,
+    this.historial,
+    this.permiteCargaConFoto = true,
   });
 
   final NavegacionViewModel navegacion;
   final CatalogoViewModel catalogo;
   final CarritoViewModel carrito;
   final SeguimientoViewModel seguimiento;
-  final EscanerViewModel escaner;
   final SesionViewModel sesion;
   final AlmacenViewModel almacen;
   final RepartoViewModel reparto;
   final AvisosViewModel? avisos;
-  final PagoRepository pagoRepositorio;
-  final SesionRepository sesionRepositorio;
-  final UbicacionEntregaRepository ubicacionEntregaRepositorio;
-  final String? pistaClaves;
+  final ConectividadViewModel? conectividad;
+  final HistorialViewModel? historial;
+
+  /// Política (ver Politicas.permiteCargaConFoto): si es false, "Mi
+  /// almacén" no muestra el botón de cargar con foto.
+  final bool permiteCargaConFoto;
 
   List<Seccion> get _secciones => [
         Seccion.comprar,
@@ -70,46 +64,26 @@ class InicioScreen extends StatelessWidget {
         if (sesion.esRepartidor) Seccion.repartir,
       ];
 
-  void _abrirIngreso(BuildContext context) {
-    final pantalla = IngresarScreen(
-      viewModel: sesion,
-      pista: pistaClaves,
-      crearRecuperacion: (email) => RecuperarClaveViewModel(
-        repositorio: sesionRepositorio,
-        email: email,
-      ),
-    );
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
-  }
+  // Rutas con nombre: quién arma cada pantalla lo decide onGenerateRoute
+  // (main.dart). Acá solo se dice A DÓNDE ir.
+  void _abrirIngreso(BuildContext context) =>
+      Navigator.pushNamed(context, Rutas.ingresar);
+
+  void _abrirCargaConFoto(BuildContext context) =>
+      Navigator.pushNamed(context, Rutas.cargarConFoto);
+
+  void _abrirPago(BuildContext context) =>
+      Navigator.pushNamed(context, Rutas.pago);
 
   // Al entrar o salir no hace falta avisarle a nadie: la barra, "Mi
   // almacén" y el reparto observan la sesión (patrón Observer).
   void _salir() => sesion.salir();
 
-  void _abrirCargaConFoto(BuildContext context) {
-    final pantalla = EscanerScreen(viewModel: escaner);
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
-  }
-
-  void _abrirPago(BuildContext context) {
-    final pantalla = PagoScreen(
-      viewModel: PagoViewModel(
-        repositorio: pagoRepositorio,
-        armarPedido: carrito.armarPedido,
-      ),
-      items: carrito.items,
-      total: carrito.total,
-      alVerPedido: () => navegacion.irA(Seccion.miPedido),
-      crearElegirUbicacion: (inicial, direccion) => ElegirUbicacionViewModel(
-        repositorio: ubicacionEntregaRepositorio,
-        inicial: inicial,
-        direccionInicial: direccion,
-      ),
-    );
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => pantalla));
+  /// "Volver a pedir": los productos de un pedido viejo, con el precio de
+  /// hoy, van al carrito y se abre el carrito para revisarlo.
+  void _volverAPedir(List<ItemCarrito> items) {
+    carrito.agregarItems(catalogo.conPreciosDeHoy(items));
+    navegacion.irA(Seccion.carrito);
   }
 
   @override
@@ -124,10 +98,19 @@ class InicioScreen extends StatelessWidget {
         return Scaffold(
           // IndexedStack conserva cada sección (búsqueda, scroll) al
           // cambiar de pestaña.
-          body: IndexedStack(
-            index: indice < 0 ? 0 : indice,
+          body: Column(
             children: [
-              for (final seccion in secciones) _pantallaDe(seccion, context),
+              if (conectividad case final conectividad?)
+                AvisoSinInternet(viewModel: conectividad),
+              Expanded(
+                child: IndexedStack(
+                  index: indice < 0 ? 0 : indice,
+                  children: [
+                    for (final seccion in secciones)
+                      _pantallaDe(seccion, context),
+                  ],
+                ),
+              ),
             ],
           ),
           bottomNavigationBar: NavigationBar(
@@ -158,11 +141,15 @@ class InicioScreen extends StatelessWidget {
       Seccion.miPedido => SeguimientoScreen(
           viewModel: seguimiento,
           avisos: avisos,
+          historial: historial,
+          alVolverAPedir: _volverAPedir,
           alIrAComprar: () => navegacion.irA(Seccion.comprar),
         ),
       Seccion.almacen => AlmacenScreen(
           viewModel: almacen,
-          alCargarConFoto: () => _abrirCargaConFoto(context),
+          alCargarConFoto: permiteCargaConFoto
+              ? () => _abrirCargaConFoto(context)
+              : null,
           alSalir: _salir,
         ),
       Seccion.repartir => RepartoScreen(viewModel: reparto, alSalir: _salir),

@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firma de la app: la llave y sus claves NUNCA van al repositorio.
+android/key.properties
+*.jks
+*.keystore

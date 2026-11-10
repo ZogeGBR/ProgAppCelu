@@ -86,7 +86,12 @@ class _IngresarScreenState extends State<IngresarScreen> {
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              Icon(Icons.storefront, size: 80, color: tema.colorScheme.primary),
+              // Imagen propia declarada en pubspec.yaml (assets).
+              Image.asset(
+                'assets/icono/logo.png',
+                height: 96,
+                semanticLabel: 'FreshMarket',
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Esto es para Don Ceferino y los repartidores. '

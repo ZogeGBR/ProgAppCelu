@@ -15,6 +15,7 @@ class ProductoCard extends StatelessWidget {
     required this.cantidadEnCarrito,
     required this.onAgregar,
     required this.onQuitar,
+    this.onVerDetalle,
   });
 
   final Producto producto;
@@ -22,12 +23,21 @@ class ProductoCard extends StatelessWidget {
   final VoidCallback onAgregar;
   final VoidCallback onQuitar;
 
+  /// Tocar la tarjeta o mantenerla apretada (gesto) abre el detalle.
+  /// Mantener apretado es un atajo: tocar hace lo mismo, así nadie se
+  /// queda sin ver el detalle por no conocer el gesto.
+  final VoidCallback? onVerDetalle;
+
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onVerDetalle,
+        onLongPress: onVerDetalle,
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -97,6 +107,7 @@ class ProductoCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -1,28 +1,45 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'config/dependencias.dart';
+import 'data/services/push_service.dart';
+import 'domain/politicas/politicas.dart';
 import 'ui/almacen/view_models/almacen_view_model.dart';
 import 'ui/avisos/view_models/avisos_view_model.dart';
 import 'ui/carrito/view_models/carrito_view_model.dart';
 import 'ui/catalogo/view_models/catalogo_view_model.dart';
+import 'ui/core/rutas.dart';
 import 'ui/core/tema.dart';
 import 'ui/escaner/view_models/escaner_view_model.dart';
+import 'ui/escaner/widgets/escaner_screen.dart';
+import 'ui/inicio/view_models/conectividad_view_model.dart';
 import 'ui/inicio/view_models/navegacion_view_model.dart';
 import 'ui/inicio/widgets/inicio_screen.dart';
+import 'ui/pago/view_models/elegir_ubicacion_view_model.dart';
+import 'ui/pago/view_models/pago_view_model.dart';
+import 'ui/pago/widgets/pago_screen.dart';
 import 'ui/reparto/view_models/reparto_view_model.dart';
+import 'ui/seguimiento/view_models/historial_view_model.dart';
 import 'ui/seguimiento/view_models/seguimiento_view_model.dart';
+import 'ui/sesion/view_models/recuperar_clave_view_model.dart';
 import 'ui/sesion/view_models/sesion_view_model.dart';
+import 'ui/sesion/widgets/ingresar_screen.dart';
 
 Future<void> main() async {
   // Firebase usa canales de plataforma: hay que tener el motor listo antes.
   WidgetsFlutterBinding.ensureInitialized();
   final hayFirebase = await _iniciarFirebase();
+  final dependencias = Dependencias.desdeConfiguracion(hayFirebase: hayFirebase);
+  // Chequeo "desde el servidor": qué funciones están prendidas. Si el
+  // servidor no responde en 3 s, se sigue con todo prendido.
+  final funciones = await dependencias.funciones.cargar();
   runApp(
     FreshMarketApp(
-      dependencias: Dependencias.desdeConfiguracion(hayFirebase: hayFirebase),
+      dependencias: dependencias,
+      politicas: Politicas(funciones: funciones),
     ),
   );
 }
@@ -34,6 +51,8 @@ Future<bool> _iniciarFirebase() async {
   if (!AppConfig.usaBackend) return false;
   try {
     await Firebase.initializeApp().timeout(const Duration(seconds: 5));
+    // Push con la app en segundo plano o cerrada: corre en otro isolate.
+    FirebaseMessaging.onBackgroundMessage(manejarPushEnSegundoPlano);
     return true;
   } on Exception catch (error) {
     debugPrint('Sin Firebase (no habrá notificaciones push): $error');
@@ -44,9 +63,17 @@ Future<bool> _iniciarFirebase() async {
 /// Widget raíz. Crea los ViewModels UNA sola vez (en initState) y los
 /// descarta al cerrar la app.
 class FreshMarketApp extends StatefulWidget {
-  const FreshMarketApp({super.key, required this.dependencias});
+  const FreshMarketApp({
+    super.key,
+    required this.dependencias,
+    this.politicas,
+  });
 
   final Dependencias dependencias;
+
+  /// Capacidades y políticas. Sin pasarla, se usa la del dispositivo con
+  /// todas las funciones prendidas (así arrancan las pruebas).
+  final Politicas? politicas;
 
   @override
   State<FreshMarketApp> createState() => _FreshMarketAppState();
@@ -62,6 +89,9 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
   late final AlmacenViewModel _almacen;
   late final RepartoViewModel _reparto;
   late final AvisosViewModel _avisos;
+  late final ConectividadViewModel _conectividad;
+  late final HistorialViewModel _historial;
+  late final Politicas _politicas;
 
   // Eventos del sistema: avisa cuando la app pasa a segundo plano.
   late final AppLifecycleListener _cicloDeVida;
@@ -75,6 +105,7 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
   void initState() {
     super.initState();
     final dependencias = widget.dependencias;
+    _politicas = widget.politicas ?? Politicas();
     // Los ViewModels no se conocen entre sí: cada uno observa a los
     // repositorios que le interesan (patrón Observer). Por ejemplo, al
     // aprobarse un pago, el PagoRepository lo publica y el carrito se vacía
@@ -86,6 +117,11 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     _carrito = CarritoViewModel(
       repositorio: dependencias.carrito,
       pagos: dependencias.pago,
+      // Política: solo si el celular puede programar avisos y el servidor
+      // tiene la función prendida.
+      recordatorios: _politicas.recuerdaCarritoOlvidado
+          ? dependencias.recordatorios
+          : null,
     );
     _catalogo = CatalogoViewModel(repositorio: dependencias.catalogo);
     _seguimiento = SeguimientoViewModel(
@@ -111,10 +147,24 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
       etiquetado: dependencias.etiquetado,
       catalogo: dependencias.catalogo,
     );
-    unawaited(_catalogo.cargar());
-    unawaited(_carrito.restaurar());
-    // Si la app se cerró con un pedido en viaje, "Mi pedido" lo retoma.
-    unawaited(_seguimiento.restaurar());
+    _conectividad =
+        ConectividadViewModel(repositorio: dependencias.conectividad);
+    _historial = HistorialViewModel(
+      repositorio: dependencias.historial,
+      pagos: dependencias.pago,
+    );
+    // Al abrir: cinco tareas independientes. Con Future.wait corren en
+    // paralelo y el arranque tarda lo que la más lenta, no la suma. (Si
+    // la app se cerró con un pedido en viaje, "Mi pedido" lo retoma.)
+    unawaited(
+      Future.wait([
+        _catalogo.cargar(),
+        _carrito.restaurar(),
+        _seguimiento.restaurar(),
+        _historial.cargar(),
+        _conectividad.revisar(),
+      ]),
+    );
     // Al tocar una notificación, la barra cambia de sección; acá se cierra
     // lo que haya encima para que esa sección se vea.
     _suscripcionAvisos =
@@ -125,13 +175,67 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
 
     // Cuando la persona sale de la app (o atiende una llamada), el sistema
     // puede cerrarla sin avisar: es el último momento seguro para guardar.
+    // onHide además de onPause: en Web y escritorio nunca se llega a
+    // paused. Y al volver (onShow/onResume) se cancela el recordatorio del
+    // carrito y se revisa la red.
     _cicloDeVida = AppLifecycleListener(
-      onHide: _guardarCarrito,
-      onPause: _guardarCarrito,
+      onHide: _alOcultarse,
+      onPause: _alOcultarse,
+      onShow: _alVolver,
+      onResume: _alVolver,
     );
   }
 
-  void _guardarCarrito() => unawaited(_carrito.guardar());
+  void _alOcultarse() => unawaited(_carrito.alOcultarseLaApp());
+
+  void _alVolver() {
+    unawaited(_carrito.alVolverALaApp());
+    unawaited(_conectividad.revisar());
+  }
+
+  /// Rutas con nombre: el ÚNICO lugar que sabe cómo se arma cada pantalla
+  /// que se abre encima (y con qué ViewModel). Las pantallas solo hacen
+  /// `Navigator.pushNamed(context, Rutas.pago)`.
+  Route<void>? _generarRuta(RouteSettings ajustes) {
+    final dependencias = widget.dependencias;
+    final Widget? pantalla = switch (ajustes.name) {
+      Rutas.ingresar => IngresarScreen(
+          viewModel: _sesion,
+          pista: Politicas.muestraCuentasDeDemo
+              ? dependencias.pistaClaves
+              : null,
+          crearRecuperacion: (email) => RecuperarClaveViewModel(
+            repositorio: dependencias.sesion,
+            email: email,
+          ),
+        ),
+      Rutas.pago => PagoScreen(
+          viewModel: PagoViewModel(
+            repositorio: dependencias.pago,
+            armarPedido: _carrito.armarPedido,
+            politicas: _politicas,
+          ),
+          items: _carrito.items,
+          total: _carrito.total,
+          alVerPedido: () => _navegacion.irA(Seccion.miPedido),
+          crearElegirUbicacion: (inicial, direccion) =>
+              ElegirUbicacionViewModel(
+            repositorio: dependencias.ubicacionEntrega,
+            inicial: inicial,
+            direccionInicial: direccion,
+          ),
+        ),
+      Rutas.cargarConFoto => EscanerScreen(viewModel: _escaner),
+      _ => null,
+    };
+    if (pantalla == null) return null;
+    // La pantalla se arma UNA vez (afuera del builder): el builder puede
+    // volver a correr y la pantalla de pago es dueña de su ViewModel.
+    return MaterialPageRoute<void>(
+      settings: ajustes,
+      builder: (_) => pantalla,
+    );
+  }
 
   /// Cierra las pantallas abiertas encima de la principal. Se detiene en una
   /// que no deje salir (el pago mientras se procesa, con PopScope): cortar
@@ -156,6 +260,8 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     _almacen.dispose();
     _reparto.dispose();
     _avisos.dispose();
+    _conectividad.dispose();
+    _historial.dispose();
     super.dispose();
   }
 
@@ -166,20 +272,19 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
       title: 'FreshMarket',
       debugShowCheckedModeBanner: false,
       theme: crearTema(),
+      onGenerateRoute: _generarRuta,
       home: InicioScreen(
         navegacion: _navegacion,
         catalogo: _catalogo,
         carrito: _carrito,
         seguimiento: _seguimiento,
-        escaner: _escaner,
         sesion: _sesion,
         almacen: _almacen,
         reparto: _reparto,
         avisos: _avisos,
-        pagoRepositorio: widget.dependencias.pago,
-        sesionRepositorio: widget.dependencias.sesion,
-        ubicacionEntregaRepositorio: widget.dependencias.ubicacionEntrega,
-        pistaClaves: widget.dependencias.pistaClaves,
+        conectividad: _conectividad,
+        historial: _historial,
+        permiteCargaConFoto: _politicas.permiteCargaConFoto,
       ),
     );
   }
