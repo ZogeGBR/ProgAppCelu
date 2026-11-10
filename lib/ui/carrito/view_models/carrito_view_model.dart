@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/carrito_repository.dart';
 import '../../../data/repositories/pago_repository.dart';
+import '../../../data/repositories/recordatorios_repository.dart';
 import '../../../domain/models/item_carrito.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/pedido.dart';
@@ -20,13 +21,18 @@ import '../../../domain/models/producto.dart';
 /// Con [pagos], observa los pedidos confirmados (patrón Observer) y se
 /// vacía solo cuando se aprueba el pago. Si el pago falla, no se toca:
 /// la persona no pierde lo que había elegido.
+///
+/// Con [recordatorios], si la persona sale de la app con el carrito lleno,
+/// el celular le recuerda el pedido más tarde (segundo plano).
 class CarritoViewModel extends ChangeNotifier {
   CarritoViewModel({
     DateTime Function()? reloj,
     CarritoRepository? repositorio,
     PagoRepository? pagos,
+    RecordatoriosRepository? recordatorios,
   })  : _reloj = reloj ?? DateTime.now,
-        _repositorio = repositorio {
+        _repositorio = repositorio,
+        _recordatorios = recordatorios {
     _suscripcion = pagos?.pedidosConfirmados.listen((_) => vaciarCarrito());
   }
 
@@ -34,6 +40,7 @@ class CarritoViewModel extends ChangeNotifier {
 
   final DateTime Function() _reloj;
   final CarritoRepository? _repositorio;
+  final RecordatoriosRepository? _recordatorios;
   late final StreamSubscription<Pedido>? _suscripcion;
   final List<ItemCarrito> _items = [];
   int _proximoNumero = primerNumeroDePedido;
@@ -75,6 +82,44 @@ class CarritoViewModel extends ChangeNotifier {
     } on Exception {
       // Si no se pudo guardar, la próxima vez se intenta de nuevo.
     }
+  }
+
+  /// La app pasó a segundo plano (evento del sistema, ver main.dart):
+  /// primero se guarda y, si quedó algo sin comprar, se programa el
+  /// recordatorio.
+  Future<void> alOcultarseLaApp() async {
+    await guardar();
+    final recordatorios = _recordatorios;
+    if (recordatorios == null || estaVacio) return;
+    try {
+      await recordatorios.recordarCarrito(cantidadTotal);
+    } on Exception {
+      // Sin recordatorio no se pierde nada: el carrito ya quedó guardado.
+    }
+  }
+
+  /// La persona volvió: el recordatorio ya no hace falta.
+  Future<void> alVolverALaApp() async {
+    try {
+      await _recordatorios?.olvidarCarrito();
+    } on Exception {
+      // Si no se pudo cancelar, llega un aviso de más: no es grave.
+    }
+  }
+
+  /// "Volver a pedir": suma estos ítems a lo que ya hay en el carrito.
+  void agregarItems(Iterable<ItemCarrito> nuevos) {
+    for (final nuevo in nuevos) {
+      final indice = _indiceDe(nuevo.producto);
+      if (indice < 0) {
+        _items.add(nuevo);
+      } else {
+        final item = _items[indice];
+        _items[indice] =
+            item.copiarCon(cantidad: item.cantidad + nuevo.cantidad);
+      }
+    }
+    notifyListeners();
   }
 
   /// Agrega un producto. Si ya estaba, suma uno a la cantidad.
