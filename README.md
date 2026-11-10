@@ -32,6 +32,22 @@ APK para probar en un celular real.
   [`docs/NOTIFICACIONES.md`](docs/NOTIFICACIONES.md).
 - Instalar la app en un celular real: [`docs/CELULAR_REAL.md`](docs/CELULAR_REAL.md).
 
+## Presentación final (19/11)
+
+- **Rúbrica, criterio por criterio, con qué mostrar y dónde está:**
+  [`docs/RUBRICA.md`](docs/RUBRICA.md).
+- **Guion de la demo y 15 preguntas probables:**
+  [`docs/DEMO_Y_DEFENSA.md`](docs/DEMO_Y_DEFENSA.md).
+- **Firma, App Bundle y prueba interna de Play Store:**
+  [`docs/PUBLICACION.md`](docs/PUBLICACION.md).
+
+Lo nuevo: capacidades y políticas (`lib/domain/politicas/`, con funciones
+que se prenden o apagan desde el servidor), rutas con nombre, catálogo
+adaptativo (grilla en pantallas anchas), gestos con "Deshacer", aviso de
+"Sin internet", recordatorio programado del carrito, push en segundo plano,
+historial de pedidos en SQLite con "Volver a pedir", ícono, splash y firma
+de la versión release.
+
 ## Cómo correrlo
 
 ### 1. Solo la app (modo demo, sin claves)
