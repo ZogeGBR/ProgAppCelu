@@ -1,0 +1,7 @@
+node_modules/
+.env
+freshmarket.db*
+
+# Clave privada de Firebase (cuenta de servicio): es secreta.
+*firebase-adminsdk*.json
+firebase-credenciales.json
