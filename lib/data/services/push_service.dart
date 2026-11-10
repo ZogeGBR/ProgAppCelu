@@ -1,8 +1,38 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../domain/models/aviso.dart';
+import 'preferencias.dart';
+
+/// Push que llega con la app en SEGUNDO PLANO o CERRADA (el cuarto caso
+/// de FCM, además de onMessage, onMessageOpenedApp y getInitialMessage).
+///
+/// Reglas de la teoría que se cumplen acá:
+/// - Es una función de NIVEL SUPERIOR (no un método) con
+///   `@pragma('vm:entry-point')`: si no, el compilador la borra en release
+///   porque nadie la llama desde Dart.
+/// - Corre en OTRO isolate, que no ve nada de la app (ni ViewModels ni
+///   variables): por eso inicializa Firebase de nuevo y deja el dato en
+///   almacenamiento compartido (shared_preferences).
+/// - Tiene poco tiempo (~30 s): solo guarda, no hace pedidos largos.
+///
+/// La notificación en la barra la muestra Android solo; esto anota qué
+/// llegó y cuándo, para que la app lo sepa la próxima vez que se abra.
+@pragma('vm:entry-point')
+Future<void> manejarPushEnSegundoPlano(RemoteMessage mensaje) async {
+  await Firebase.initializeApp();
+  await const Preferencias().guardar(
+    Preferencias.claveUltimoAvisoEnSegundoPlano,
+    jsonEncode({
+      ...mensaje.data,
+      'titulo': mensaje.notification?.title,
+      'recibidoEn': DateTime.now().toIso8601String(),
+    }),
+  );
+}
 
 /// De dónde llegan las notificaciones push (patrón Strategy).
 ///
