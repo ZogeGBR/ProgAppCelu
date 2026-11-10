@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/catalogo_repository.dart';
+import '../../../domain/models/item_carrito.dart';
 import '../../../domain/models/producto.dart';
 import '../../core/estado_carga.dart';
 
@@ -48,6 +49,16 @@ class CatalogoViewModel extends ChangeNotifier {
       return coincideCategoria && coincideTexto;
     }).toList();
   }
+
+  /// Para "Volver a pedir": cambia cada producto del pedido viejo por el de
+  /// HOY (con el precio del día) y deja afuera lo que ya no se vende o
+  /// está sin stock.
+  List<ItemCarrito> conPreciosDeHoy(Iterable<ItemCarrito> viejos) => [
+        for (final item in viejos)
+          for (final producto in _productos)
+            if (producto.id == item.producto.id && producto.disponible)
+              ItemCarrito(producto: producto, cantidad: item.cantidad),
+      ];
 
   /// Carga el catálogo. También sirve para reintentar después de un error.
   /// La lista nueva llega por [_alCambiarCatalogo] (el repositorio avisa).

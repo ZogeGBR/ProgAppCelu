@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferencias.dart';
 
 /// Guarda en el celular el pedido que se está siguiendo.
 ///
@@ -18,24 +18,21 @@ abstract interface class PedidoLocalService {
 class PedidoLocalServicePreferencias implements PedidoLocalService {
   const PedidoLocalServicePreferencias();
 
-  static const _clave = 'pedido_en_curso_v1';
+  static const _clave = Preferencias.clavePedidoEnCurso;
 
   @override
   Future<String?> leer() async {
-    final preferencias = await SharedPreferences.getInstance();
-    return preferencias.getString(_clave);
+    return const Preferencias().leer(_clave);
   }
 
   @override
   Future<void> guardar(String json) async {
-    final preferencias = await SharedPreferences.getInstance();
-    await preferencias.setString(_clave, json);
+    await const Preferencias().guardar(_clave, json);
   }
 
   @override
   Future<void> borrar() async {
-    final preferencias = await SharedPreferences.getInstance();
-    await preferencias.remove(_clave);
+    await const Preferencias().borrar(_clave);
   }
 }
 

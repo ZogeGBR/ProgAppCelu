@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'preferencias.dart';
 
 /// Guarda el carrito en el celular, para que no se pierda si la persona
 /// cierra la app (o el sistema la cierra para liberar memoria).
@@ -11,25 +11,22 @@ abstract interface class CarritoLocalService {
   Future<void> guardar(String json);
 }
 
-/// Usa shared_preferences: alcanza para datos chicos de clave y valor.
-/// Para historial de pedidos con búsquedas haría falta SQLite (sqflite).
+/// Usa shared_preferences (ver Preferencias): alcanza para datos chicos de
+/// clave y valor. El historial de pedidos, que es una lista que se ordena
+/// y se recorta, va en SQLite (historial_dao.dart).
 class CarritoLocalServicePreferencias implements CarritoLocalService {
   const CarritoLocalServicePreferencias();
 
-  static const _clave = 'carrito_v1';
+  static const _clave = Preferencias.claveCarrito;
 
   @override
   Future<String?> leer() async {
-    // getInstance() devuelve siempre la misma instancia (Singleton del
-    // paquete): no se abre el archivo cada vez.
-    final preferencias = await SharedPreferences.getInstance();
-    return preferencias.getString(_clave);
+    return const Preferencias().leer(_clave);
   }
 
   @override
   Future<void> guardar(String json) async {
-    final preferencias = await SharedPreferences.getInstance();
-    await preferencias.setString(_clave, json);
+    await const Preferencias().guardar(_clave, json);
   }
 }
 
