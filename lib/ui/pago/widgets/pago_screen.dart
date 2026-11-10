@@ -267,7 +267,7 @@ class _ElegirMetodo extends StatelessWidget {
         const SizedBox(height: 24),
         Text('2. Elegí cómo querés pagar', style: tema.textTheme.titleMedium),
         const SizedBox(height: 12),
-        for (final opcion in MetodoPago.values)
+        for (final opcion in viewModel.metodosDisponibles)
           _OpcionPago(
             metodo: opcion,
             elegido: opcion == metodo,

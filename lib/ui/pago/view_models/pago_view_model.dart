@@ -7,6 +7,7 @@ import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/pedido.dart';
 import '../../../domain/models/posicion.dart';
 import '../../../domain/models/resultado_pago.dart';
+import '../../../domain/politicas/politicas.dart';
 
 /// Pasos de la pantalla de pago.
 enum PasoPago {
@@ -29,10 +30,21 @@ class PagoViewModel extends ChangeNotifier {
   PagoViewModel({
     required PagoRepository repositorio,
     required Pedido Function(MetodoPago metodo) armarPedido,
+    Politicas? politicas,
   })  : _repositorio = repositorio,
-        _armarPedido = armarPedido;
+        _armarPedido = armarPedido,
+        _politicas = politicas ?? Politicas();
 
   final PagoRepository _repositorio;
+  final Politicas _politicas;
+
+  /// Los medios que se muestran. El efectivo depende de una política que
+  /// manda el servidor (ver Politicas.permitePagoEnEfectivo).
+  List<MetodoPago> get metodosDisponibles => [
+        for (final metodo in MetodoPago.values)
+          if (metodo != MetodoPago.efectivo || _politicas.permitePagoEnEfectivo)
+            metodo,
+      ];
   final Pedido Function(MetodoPago metodo) _armarPedido;
 
   MetodoPago? _metodo;

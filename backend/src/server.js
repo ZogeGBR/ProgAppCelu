@@ -13,6 +13,11 @@ const push = await crearPush({ credenciales: process.env.FIREBASE_CREDENCIALES }
 
 const app = crearApp({
   push,
+  // Por ejemplo FUNCIONES_APAGADAS=pagoEnEfectivo,cargaConFoto
+  funcionesApagadas: (process.env.FUNCIONES_APAGADAS ?? '')
+    .split(',')
+    .map((nombre) => nombre.trim())
+    .filter(Boolean),
   mpAccessToken: process.env.MP_ACCESS_TOKEN,
   mpSandbox: process.env.MP_SANDBOX === 'true',
   mpWebhookSecret: process.env.MP_WEBHOOK_SECRET,
