@@ -533,3 +533,66 @@ Las pruebas de este comportamiento están en `test/observer_test.dart`.
 Ver [`NOTIFICACIONES.md`](NOTIFICACIONES.md): qué se avisa, el recorrido de
 un aviso desde el backend hasta la barra del celular y cómo configurar
 Firebase.
+
+## Presentación final: piezas nuevas
+
+```mermaid
+classDiagram
+    direction LR
+    class Politicas {
+      +esCelular bool
+      +puedeSacarFotos bool
+      +puedeGuardarHistorial bool
+      +permitePagoEnEfectivo bool
+      +muestraCuentasDeDemo$ bool
+      +conFunciones(Funciones) Politicas
+    }
+    class Funciones {
+      +pagoEnEfectivo bool
+      +cargaConFoto bool
+      +recordatorioCarrito bool
+    }
+    class FuncionesRepository { +cargar() Future~Funciones~ }
+    class FuncionesService {<<interface>>}
+    class ConectividadViewModel { +hayRed bool +revisar() }
+    class ConectividadRepository { +cambios Stream~bool~ }
+    class ConectividadService {<<interface>>}
+    class HistorialViewModel { +pedidos +cargar() }
+    class HistorialRepository { +guardar(Pedido) +ultimos() +limpiarViejos() }
+    class HistorialService {<<interface>>}
+    class HistorialDao { +guardar() +ultimos() +borrarAnterioresA() }
+    class RecordatoriosRepository { +recordarCarrito(n) +olvidarCarrito() }
+    class RecordatorioService {<<interface>>}
+    class Preferencias { +leer() +guardar() +borrar() }
+
+    Politicas --> Funciones
+    FuncionesRepository --> FuncionesService
+    FuncionesService <|.. FuncionesServiceHttp
+    FuncionesService <|.. FuncionesServiceSimulado
+    ConectividadViewModel --> ConectividadRepository
+    ConectividadRepository --> ConectividadService
+    ConectividadService <|.. ConectividadServicePlus
+    ConectividadService <|.. ConectividadServiceSimulado
+    HistorialViewModel --> HistorialRepository
+    HistorialViewModel ..> PagoRepository : observa pedidosConfirmados
+    HistorialRepository --> HistorialService
+    HistorialService <|.. HistorialDao
+    HistorialService <|.. HistorialServiceMemoria
+    CarritoViewModel --> RecordatoriosRepository
+    RecordatoriosRepository --> RecordatorioService
+    RecordatorioService <|.. RecordatorioServicePlugin
+    RecordatorioService <|.. RecordatorioServiceSimulado
+    CarritoLocalServicePreferencias --> Preferencias
+    PedidoLocalServicePreferencias --> Preferencias
+    PagoViewModel --> Politicas
+```
+
+**Rutas con nombre:** `InicioScreen` hace `Navigator.pushNamed(context,
+Rutas.pago)` y `onGenerateRoute` (en `main.dart`) arma `PagoScreen`,
+`IngresarScreen` o `EscanerScreen` con su ViewModel. Ninguna pantalla
+necesita saber cómo se construye otra.
+
+**Base del celular (`HistorialDao`, versión 2):** tabla `pedidos` (`id` PK,
+`numero`, `fecha` TEXT ISO, `metodo_pago`, `total` REAL, `items` TEXT JSON,
+`direccion` TEXT, agregada en la versión 2 con `onUpgrade`) e índice por
+fecha.
