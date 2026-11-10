@@ -51,6 +51,7 @@ export function crearApp(config = {}) {
     push = pushEnConsola(),
     secretoSesion = crypto.randomBytes(32).toString('hex'),
     simularReparto = !mpAccessToken,
+    funcionesApagadas = [],
   } = config;
 
   abrirBd(rutaBd);
@@ -77,6 +78,15 @@ export function crearApp(config = {}) {
   app.use(express.json({ limit: '8mb' }));
 
   const urlLocalDe = (req) => urlPublica || `${req.protocol}://${req.get('host')}`;
+
+  // Funciones que se prenden o apagan desde el servidor (la app las lee al
+  // abrirse). Ver lib/domain/politicas/politicas.dart.
+  const funciones = {
+    pagoEnEfectivo: !funcionesApagadas.includes('pagoEnEfectivo'),
+    cargaConFoto: !funcionesApagadas.includes('cargaConFoto'),
+    recordatorioCarrito: !funcionesApagadas.includes('recordatorioCarrito'),
+  };
+  app.get('/funciones', (_req, res) => res.json(funciones));
 
   app.get('/salud', (_req, res) => {
     res.json({
@@ -173,6 +183,11 @@ export function crearApp(config = {}) {
 
   // --- Pagos ---
   app.post('/pagos/preferencia', async (req, res, next) => {
+    // La política también se hace cumplir acá: aunque una app vieja muestre
+    // "Efectivo", el servidor no lo acepta si está apagado.
+    if (req.body?.metodoPago === 'efectivo' && !funciones.pagoEnEfectivo) {
+      return res.status(400).json({ error: 'Hoy no se acepta efectivo.' });
+    }
     try {
       const preferencia = await crearPreferencia({
         cliente: clienteMp,

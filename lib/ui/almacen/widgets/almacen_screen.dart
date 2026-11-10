@@ -17,7 +17,10 @@ class AlmacenScreen extends StatelessWidget {
   });
 
   final AlmacenViewModel viewModel;
-  final VoidCallback alCargarConFoto;
+
+  /// null: este celular no puede (o el servidor apagó la función). Lo
+  /// decide la política `permiteCargaConFoto`; la pantalla solo obedece.
+  final VoidCallback? alCargarConFoto;
   final VoidCallback alSalir;
 
   @override
@@ -56,7 +59,7 @@ class _Lista extends StatelessWidget {
   const _Lista({required this.viewModel, required this.alCargarConFoto});
 
   final AlmacenViewModel viewModel;
-  final VoidCallback alCargarConFoto;
+  final VoidCallback? alCargarConFoto;
 
   @override
   Widget build(BuildContext context) {
@@ -66,12 +69,14 @@ class _Lista extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          FilledButton.icon(
-            onPressed: alCargarConFoto,
-            icon: const Icon(Icons.add_a_photo),
-            label: const Text('Cargar producto con una foto'),
-          ),
-          const SizedBox(height: 12),
+          if (alCargarConFoto != null) ...[
+            FilledButton.icon(
+              onPressed: alCargarConFoto,
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Cargar producto con una foto'),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (viewModel.fallo)
             Card(
               color: colores.errorContainer,
