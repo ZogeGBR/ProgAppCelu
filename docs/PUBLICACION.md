@@ -90,3 +90,33 @@ Marcar cada punto y sacar una captura (van al PDF de la presentación):
 - [ ] "Volver a pedir" desde el historial.
 - [ ] Dueño: cargar un producto con una foto, cambiar un precio.
 - [ ] Repartidor: compartir el GPS y marcar "Entregado".
+
+## 7. iOS (iPhone)
+
+El APK es solo para Android. Para iPhone hay que compilar **en una Mac con
+Xcode**: Apple no permite hacerlo desde Windows.
+
+Lo que ya está listo en el proyecto:
+
+- `ios/Runner/Info.plist`: nombre "FreshMarket", permisos de cámara, fotos
+  y ubicación **con el motivo** que ve el usuario, y `UIBackgroundModes`
+  con `remote-notification` para los avisos push en segundo plano.
+- Íconos de iOS generados por `flutter_launcher_icons` y pantalla de
+  arranque por `flutter_native_splash`.
+- El código decide por capacidades (`Politicas.esCelular` incluye
+  `TargetPlatform.iOS`), así que no hay ramas especiales para iPhone.
+
+Pasos en una Mac:
+
+```bash
+flutter pub get
+cd ios && pod install && cd ..
+open ios/Runner.xcworkspace     # Signing & Capabilities: elegir el equipo (Apple ID)
+flutter run --release           # con el iPhone conectado por cable
+```
+
+| Cuenta de Apple | Qué permite |
+|---|---|
+| Apple ID gratis | Instalar por cable en un iPhone propio; la app deja de abrir a los 7 días |
+| Apple Developer (USD 99 por año) | TestFlight (prueba con otras personas) y App Store; push con APNs (subir la llave `.p8` a Firebase) |
+

@@ -75,19 +75,12 @@ ver [`NOTIFICACIONES.md`](NOTIFICACIONES.md), sección 4.
 | Modo oscuro | Activarlo en el sistema | Se sigue leyendo bien |
 | Sin internet | Modo avión en "Comprar" (con backend) | "Revisá tu conexión a internet" con "Reintentar" |
 
-## Publicación (qué faltaría para Play Store)
+## Publicación
 
-Hoy el APK de release se firma con la **clave de debug** de Flutter
-(`android/app/build.gradle.kts`, `signingConfig = debug`). Sirve para
-instalarlo a mano, pero Play Store no lo acepta. Para publicar:
+La firma con llave propia (`android/key.properties`, fuera del repo), el App
+Bundle y la prueba interna en Play Console están en
+[`PUBLICACION.md`](PUBLICACION.md). Sin `key.properties` el APK se firma
+con la llave de prueba, que alcanza para instalarlo a mano.
 
-1. Crear una clave propia: `keytool -genkey -v -keystore freshmarket.jks
-   -keyalg RSA -keysize 2048 -validity 10000 -alias freshmarket` (el `.jks`
-   y su contraseña **no** se suben al repo).
-2. Configurarla en `android/key.properties` y en el `signingConfigs` del
-   `build.gradle.kts`.
-3. `flutter build appbundle` → subir el `.aab` a Play Console (cuenta de
-   desarrollador, pago único de 25 USD), con política de privacidad (la app
-   usa ubicación y cámara) y la ficha de la tienda.
-4. Cambiar el `applicationId` `com.freshmarket.freshmarket_app` por uno
-   definitivo **antes** de la primera publicación (después no se puede).
+La guía completa para alguien que arranca sin nada instalado está en
+[`GUIA_APK_DESDE_CERO.md`](GUIA_APK_DESDE_CERO.md).
