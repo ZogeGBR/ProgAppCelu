@@ -27,6 +27,17 @@ en el código y **qué prueba** lo respalda. Escala: 3 Logrado · 2 En proceso
 | **F2** | Testing en dispositivo real y publicación | APK release instalado en un celular real, checklist con capturas, firma con llave propia (`key.properties` fuera del repo), App Bundle listo para la prueba interna de Play Console | `docs/CELULAR_REAL.md`, `docs/PUBLICACION.md`, `android/app/build.gradle.kts` | checklist de `docs/PUBLICACION.md` |
 | **G1** | Demo y defensa | Guion de 10 minutos, plan B sin internet y 15 preguntas probables con su respuesta | `docs/DEMO_Y_DEFENSA.md` | ensayo |
 
+## Resultados (15/11, Windows, Flutter estable)
+
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **157 pruebas, All tests passed!**
+- `npm test` (backend): **47/47**
+
+La primera corrida encontró un error real: la hoja de detalle del producto se
+desbordaba 25 píxeles en pantallas bajas (prueba "tocar un producto abre su
+detalle"). Se corrigió haciéndola desplazable (`d7cdb5f`) y la prueba pasó.
+Las capturas están en [`evidencias/`](evidencias/).
+
 ## Antes de presentar (comandos)
 
 ```bash
