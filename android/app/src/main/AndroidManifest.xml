@@ -46,6 +46,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="pedidos" />
+        <!-- Y con el mismo ícono chico que las notificaciones locales. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notificacion" />
         <!-- flutter_local_notifications: muestran los avisos programados a
              la hora pedida y los reprograman después de reiniciar. -->
         <receiver

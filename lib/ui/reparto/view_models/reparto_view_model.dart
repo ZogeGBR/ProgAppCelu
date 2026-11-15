@@ -55,7 +55,7 @@ class RepartoViewModel extends ChangeNotifier {
   bool _descartado = false;
 
   PasoReparto get paso => _paso;
-  List<PedidoReparto> get pedidos => _pedidos;
+  List<PedidoReparto> get pedidos => List.unmodifiable(_pedidos);
   PedidoReparto? get actual => _actual;
   Posicion? get posicion => _posicion;
   bool get entregando => _entregando;

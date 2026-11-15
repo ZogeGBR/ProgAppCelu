@@ -45,6 +45,14 @@ void main() {
     expect(catalogo.productosVisibles.first.precio, 4200);
   });
 
+  test('la lista es de solo lectura: la vista no puede cambiar el estado',
+      () {
+    // Encapsulamiento (MVVM): el estado solo cambia por los métodos del
+    // ViewModel, que validan y avisan. Un .clear() desde la vista falla.
+    expect(() => viewModel.productos.clear(), throwsUnsupportedError);
+    expect(viewModel.productos.length, 3);
+  });
+
   test('un precio inválido no se guarda', () async {
     final yerbaCargada = viewModel.productos.first;
 

@@ -24,7 +24,7 @@ en el código y **qué prueba** lo respalda. Escala: 3 Logrado · 2 En proceso
 | **E2** | Segundo plano | `zonedSchedule` con `TZDateTime` e `inexactAllowWhileIdle`: "Te quedó un pedido sin terminar" 2 h después de salir con el carrito lleno; receptores para que sobreviva a un reinicio. Manejador de push en otro isolate. `workmanager` justificado como no necesario | `recordatorio_service.dart`, `recordatorios_repository.dart`, `AndroidManifest.xml` | `segundo_plano_y_eventos_test.dart` |
 | **E3** | Eventos del sistema | `AppLifecycleListener` (`onHide`/`onPause` guardan y programan; `onShow`/`onResume` cancelan y revisan la red), `connectivity_plus` con aviso "Sin internet", bus de eventos propio (Streams de los repositorios). Todas las suscripciones se cancelan | `main.dart`, `conectividad_*`, `aviso_sin_internet.dart` | `segundo_plano_y_eventos_test.dart`, "sin internet aparece el aviso" |
 | **F1** | Persistencia, APIs y cámara | `SharedPreferencesAsync` (carrito, pedido en curso) con patrón Preferencias; **SQLite** con DAO, `toMap/fromMap`, consultas con `?` y migración (`onUpgrade`); SQL del servidor (`backend/sql/schema.sql`). APIs: backend propio, Mercado Pago, Gemini, Nominatim/Google, FCM. Cámara con `image_picker` y permisos | `preferencias.dart`, `historial_dao.dart`, `backend/sql/`, `camara_service.dart` | `historial_dao_test.dart`, `carrito_guardado_test.dart`, `pedido_guardado_test.dart` |
-| **F2** | Testing en dispositivo real y publicación | APK release instalado en un celular real, checklist con capturas, firma con llave propia (`key.properties` fuera del repo), App Bundle listo para la prueba interna de Play Console | `docs/CELULAR_REAL.md`, `docs/PUBLICACION.md`, `android/app/build.gradle.kts` | checklist de `docs/PUBLICACION.md` |
+| **F2** | Testing en dispositivo real y publicación | APK release instalado en un celular real, checklist con capturas, firma con llave propia (`key.properties` fuera del repo), App Bundle listo para la prueba interna de Play Console | `docs/GUIA_APK_DESDE_CERO.md`, `docs/CELULAR_REAL.md`, `docs/PUBLICACION.md`, `android/app/build.gradle.kts` | checklist de `docs/PUBLICACION.md` |
 | **G1** | Demo y defensa | Guion de 10 minutos, plan B sin internet y 15 preguntas probables con su respuesta | `docs/DEMO_Y_DEFENSA.md` | ensayo |
 
 ## Resultados (15/11, Windows, Flutter estable)
@@ -37,6 +37,9 @@ La primera corrida encontró un error real: la hoja de detalle del producto se
 desbordaba 25 píxeles en pantallas bajas (prueba "tocar un producto abre su
 detalle"). Se corrigió haciéndola desplazable (`d7cdb5f`) y la prueba pasó.
 Las capturas están en [`evidencias/`](evidencias/).
+
+Auditoría completa (MVC, rúbrica, pedidos iniciales y riesgos de celular
+real): [`AUDITORIA_FINAL.md`](AUDITORIA_FINAL.md).
 
 ## Antes de presentar (comandos)
 

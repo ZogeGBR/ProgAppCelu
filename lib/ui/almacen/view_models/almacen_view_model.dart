@@ -35,7 +35,7 @@ class AlmacenViewModel extends ChangeNotifier {
   bool _descartado = false;
 
   EstadoCarga get estado => _estado;
-  List<Producto> get productos => _productos;
+  List<Producto> get productos => List.unmodifiable(_productos);
 
   /// El último cambio no se pudo guardar.
   bool get fallo => _fallo;

@@ -48,8 +48,10 @@ class NotificacionLocalServicePlugin implements NotificacionLocalService {
   Future<void> iniciar() async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        // El ícono de la app, en blanco sobre la barra de estado.
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // Silueta blanca propia (res/drawable/ic_notificacion.xml): el
+        // ícono de la app es a color y adaptativo, y no sirve para la barra
+        // de estado. res/raw/keep.xml evita que R8 lo borre en release.
+        android: AndroidInitializationSettings('@drawable/ic_notificacion'),
         // En iOS el permiso se pide aparte, con pedirPermiso().
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,

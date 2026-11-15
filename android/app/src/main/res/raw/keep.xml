@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- En release, R8 borra los recursos que no ve usados desde el código
+     Java/Kotlin. El ícono de las notificaciones se nombra desde Dart
+     ('@drawable/ic_notificacion'), así que hay que pedirle que lo deje:
+     si no, las notificaciones fallan en silencio en el APK final. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notificacion" />

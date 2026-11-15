@@ -30,6 +30,8 @@ APK para probar en un celular real.
   [`docs/GUIA_PATRONES.md`](docs/GUIA_PATRONES.md).
 - Notificaciones push y cómo configurar Firebase:
   [`docs/NOTIFICACIONES.md`](docs/NOTIFICACIONES.md).
+- **Auditoría final** (MVC, los 18 criterios y lo pedido al inicio, con evidencia):
+  [`docs/AUDITORIA_FINAL.md`](docs/AUDITORIA_FINAL.md).
 - **Desde cero hasta el APK en el celular** (instalar todo en Windows, compilar,
   instalar y capturas para F2): [`docs/GUIA_APK_DESDE_CERO.md`](docs/GUIA_APK_DESDE_CERO.md).
 - Instalar la app en un celular real: [`docs/CELULAR_REAL.md`](docs/CELULAR_REAL.md).

@@ -28,7 +28,7 @@ class HistorialViewModel extends ChangeNotifier {
   bool _cargando = false;
   bool _descartado = false;
 
-  List<PedidoAnterior> get pedidos => _pedidos;
+  List<PedidoAnterior> get pedidos => List.unmodifiable(_pedidos);
   bool get cargando => _cargando;
   bool get hayPedidos => _pedidos.isNotEmpty;
 

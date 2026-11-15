@@ -124,7 +124,7 @@ flutter test
 | Comando | Resultado esperado |
 |---|---|
 | `flutter analyze` | `No issues found!` |
-| `flutter test` | `All tests passed!` (157 pruebas) |
+| `flutter test` | `All tests passed!` (158 pruebas) |
 
 En `flutter test` aparecen algunos mensajes como "No se pudo anotar el
 celular para los avisos": son pruebas que simulan errores **a propósito**.
