@@ -128,6 +128,9 @@ class _ListaDeProductos extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      // Puede crecer más que la mitad de la pantalla (letra grande,
+      // descripción larga); si igual no entra, el contenido se desplaza.
+      isScrollControlled: true,
       builder: (contexto) => _DetalleProducto(
         producto: producto,
         alAgregar: () {
@@ -214,7 +217,8 @@ class _DetalleProducto extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     return SafeArea(
-      child: Padding(
+      // Con poco alto o la letra agrandada, se desplaza en vez de cortarse.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
