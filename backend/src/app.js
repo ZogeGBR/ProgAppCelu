@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 
 import { abrirBd } from './bd.js';
+import { crearCupo, LIMITES, MAX_POR_DIA, MAX_POR_MINUTO } from './cupo.js';
 import {
   actualizarProducto,
   agregarProducto,
@@ -52,6 +53,9 @@ export function crearApp(config = {}) {
     secretoSesion = crypto.randomBytes(32).toString('hex'),
     simularReparto = !mpAccessToken,
     funcionesApagadas = [],
+    maxPedidosPorDia = MAX_POR_DIA,
+    maxPedidosPorMinuto = MAX_POR_MINUTO,
+    reloj = Date.now,
   } = config;
 
   abrirBd(rutaBd);
@@ -66,6 +70,11 @@ export function crearApp(config = {}) {
   });
 
   const clienteMp = crearClienteMercadoPago(mpAccessToken);
+  const pedirLugar = crearCupo({
+    porDia: maxPedidosPorDia,
+    porMinuto: maxPedidosPorMinuto,
+    ahora: reloj,
+  });
   const soloDueno = exigirRol(secretoSesion, 'dueno');
   const soloReparto = exigirRol(secretoSesion, 'repartidor', 'dueno');
   const intentoPermitido = crearLimitadorDeIntentos();
@@ -93,6 +102,7 @@ export function crearApp(config = {}) {
       ok: true,
       mercadoPago: clienteMp ? 'real' : 'simulado',
       ia: geminiApiKey ? 'gemini' : 'simulada',
+      pedidos: { maxPorDia: maxPedidosPorDia, maxPorMinuto: maxPedidosPorMinuto },
     });
   });
 
@@ -187,6 +197,18 @@ export function crearApp(config = {}) {
     // "Efectivo", el servidor no lo acepta si está apagado.
     if (req.body?.metodoPago === 'efectivo' && !funciones.pagoEnEfectivo) {
       return res.status(400).json({ error: 'Hoy no se acepta efectivo.' });
+    }
+    // Hasta 100 pedidos por día y 100 por minuto (ver cupo.js). 429 = "por
+    // ahora no": la app muestra un mensaje claro en vez de un error.
+    const limite = pedirLugar();
+    if (limite) {
+      return res.status(429).json({
+        error:
+          limite === LIMITES.porDia
+            ? 'Por hoy ya no tomamos más pedidos. ¡Te esperamos mañana!'
+            : 'Hay muchos pedidos en este momento. Probá en un minuto.',
+        limite,
+      });
     }
     try {
       const preferencia = await crearPreferencia({

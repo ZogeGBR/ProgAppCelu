@@ -1,6 +1,10 @@
 // Prueba de carga: simula N clientes haciendo un pedido al mismo tiempo.
 //
-//   node scripts/carga.mjs 500
+//   node scripts/carga.mjs 100
+//
+// FreshMarket está dimensionado para 100 pedidos por día y 100 por minuto
+// (src/cupo.js). Con más de 100 clientes a la vez, los que pasan el tope
+// reciben "probá en un minuto" (429): se cuentan aparte, no como errores.
 //
 // Levanta un servidor aparte con una base temporal y modo de pago simulado.
 // Cada cliente hace lo mismo que la app: ve el catálogo, crea el pedido, paga,
@@ -14,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const clientes = Number(process.argv[2] ?? 500);
+const clientes = Number(process.argv[2] ?? 100);
 const puerto = 3900;
 const url = `http://127.0.0.1:${puerto}`;
 const raiz = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -28,23 +32,28 @@ const servidor = spawn(process.execPath, ['src/server.js'], {
 
 const tiempos = [];
 let errores = 0;
+let sinLugar = 0;
 
 async function medir(ruta, opciones) {
   const inicio = performance.now();
   try {
     const respuesta = await fetch(`${url}${ruta}`, opciones);
     await respuesta.arrayBuffer();
-    if (!respuesta.ok) errores += 1;
+    if (respuesta.status === 429) sinLugar += 1;
+    else if (!respuesta.ok) errores += 1;
+    tiempos.push(performance.now() - inicio);
+    return respuesta.status;
   } catch {
     errores += 1;
   }
   tiempos.push(performance.now() - inicio);
+  return 0;
 }
 
 async function cliente(indice) {
   const id = `carga-${indice}`;
   await medir('/productos');
-  await medir('/pagos/preferencia', {
+  const estado = await medir('/pagos/preferencia', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -54,6 +63,8 @@ async function cliente(indice) {
       items: [{ productoId: 'p2', cantidad: 1 }],
     }),
   });
+  // Sin lugar (tope del minuto o del día): la app le dice que pruebe después.
+  if (estado === 429) return;
   await medir(`/pago/simulado/${id}`);
   await medir(`/pagos/${id}/estado`);
   await medir(`/pedidos/${id}/seguimiento`);
@@ -82,6 +93,7 @@ try {
   const ordenados = [...tiempos].sort((a, b) => a - b);
   console.log(`Clientes simultáneos: ${clientes}`);
   console.log(`Peticiones: ${tiempos.length}, con error: ${errores}`);
+  console.log(`Pedidos sin lugar (pasaron el tope de 100): ${sinLugar}`);
   console.log(`Duración total: ${(duracion / 1000).toFixed(2)} s`);
   console.log(`Peticiones por segundo: ${Math.round(tiempos.length / (duracion / 1000))}`);
   console.log(

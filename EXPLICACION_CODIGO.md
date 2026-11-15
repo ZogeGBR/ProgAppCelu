@@ -966,7 +966,7 @@ Cosas que no son errores pero que vale la pena conocer, por si te preguntan o qu
 5. **El catálogo es fijo.** Los precios del día de Don Ceferino deberían venir de una API o base de datos para que él los pueda cambiar.
 6. **Prop drilling:** pasar el carrito por constructor está bien con 4 pantallas. Con muchas más, se suele usar `InheritedWidget` o el paquete `provider` para no pasarlo a mano por todos lados.
 7. **El pago y el seguimiento son simulados**: `Future.delayed` y `Timer`. Los "puntos de extensión" están comentados en el código.
-8. **5.000 pedidos simultáneos sin pagar servidor**: no es un problema de esta app (el frontend) sino del backend, y además las dos cosas son incompatibles. Está explicado en el README para el informe.
+8. **5.000 pedidos simultáneos sin pagar servidor**: las dos cosas son incompatibles. El sistema se dimensionó para lo que recibe un almacén de barrio: **100 pedidos por día y 100 por minuto**. El tope lo hace cumplir el backend (`backend/src/cupo.js`); la app traduce la respuesta 429 a `SinLugarParaPedidos` (dominio) en `PagoRepository`, y `PagoScreen` muestra "Por hoy ya no tomamos más pedidos" o "Probá en un minuto".
 
 ---
 

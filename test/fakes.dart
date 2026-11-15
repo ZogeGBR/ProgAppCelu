@@ -267,6 +267,10 @@ class PagoServiceFalso implements PagoService {
 
   final List<String> respuestas;
   bool fallaAlCrear = false;
+
+  /// Respuesta de error del servidor al crear el pago (por ejemplo, 429
+  /// cuando el almacén llegó a su tope de pedidos).
+  ApiException? rechazoAlCrear;
   final pedidosEnviados = <Map<String, dynamic>>[];
   int _consultas = 0;
 
@@ -275,6 +279,8 @@ class PagoServiceFalso implements PagoService {
     Map<String, dynamic> pedido,
   ) async {
     if (fallaAlCrear) throw Exception('backend caído');
+    final rechazo = rechazoAlCrear;
+    if (rechazo != null) throw rechazo;
     pedidosEnviados.add(pedido);
     return {
       'preferenciaId': 'pref-1',

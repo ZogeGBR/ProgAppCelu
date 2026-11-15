@@ -14,9 +14,9 @@ una prueba o un comando.
 | Reglas de capas MVC/MVVM | **5 de 5 se cumplen, sin excepciones** |
 | Encapsulamiento | 3 huecos chicos, **corregidos** (ver abajo) |
 | Rúbrica | 17 de 18 con evidencia completa; **F2 espera las capturas del celular real** |
-| Pedidos de Don Ceferino | 6 de 6 resueltos; el de 5.000 pedidos, justificado y acordado |
+| Pedidos de Don Ceferino | 6 de 6 resueltos; el de 5.000 pedidos, justificado y dimensionado para 100 por día y 100 por minuto |
 | Correcciones del 07/11 | 6 de 6 en el código |
-| Pruebas | App: 157 en verde (15/11) + 1 nueva; backend: 47/47 (corrido hoy) |
+| Pruebas | App: 157 en verde (15/11) + 5 nuevas = 162; backend: 52/52 (corrido hoy) |
 | Riesgos de celular real encontrados | 2, **corregidos** (ícono de notificaciones e iOS) |
 
 ## 1. MVC / MVVM
@@ -66,7 +66,7 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 
 | Criterio | Estado | Evidencia comprobada en el código |
 |---|---|---|
-| **A1** Alcance | Cumple | Tabla "De la entrevista al código" (README); `backend/scripts/carga.mjs` para el pico de 500 |
+| **A1** Alcance | Cumple | Tabla "De la entrevista al código" (README); `backend/src/cupo.js` (100 por día y por minuto) y `backend/scripts/carga.mjs` |
 | **B1** Widgets | Cumple | `VistaMensaje`, `CampoClave`, `SelectorCantidad`, `ProductoCard`, `AvisoSinInternet`, `HistorialDePedidos`; `tema.dart` |
 | **B2** Estado y ciclo de vida | Cumple | 8 `StatefulWidget` con `initState`/`dispose`; `didUpdateWidget` en `mapa_repartidor.dart` |
 | **B3** Navegación y gestos | Cumple | `rutas.dart` + `onGenerateRoute`; mantener apretado, deslizar con "Deshacer", tirar para recargar; pruebas en `presentacion_final_test.dart` |
@@ -74,7 +74,7 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 | **C1** Capas | Cumple | Sección 1 de este informe; `docs/diagramas/capas.png` y `clases.png` |
 | **C2** Código limpio | Cumple | `flutter analyze` sin avisos con `unawaited_futures` y `use_build_context_synchronously` |
 | **C3** Refactoring | Cumple | `caracterizacion_test.dart`; refactorings nombrados en `INFORME_MEJORAS.md` |
-| **C4** Pruebas | Cumple | 21 archivos de prueba (158 pruebas) + 47 del backend; capturas en `docs/evidencias/` |
+| **C4** Pruebas | Cumple | 21 archivos de prueba (162 pruebas) + 52 del backend; capturas en `docs/evidencias/` |
 | **D1** Políticas | Cumple | `politicas.dart` con los tres chequeos; `politicas_test.dart`, `funciones.test.js` |
 | **D2** Future | Cumple | `timeout` en `funciones_repository.dart`, `Future.wait` en `main.dart`, `context.mounted` en `ingresar_screen.dart` |
 | **D3** Streams e Isolates | Cumple | `Stream.periodic` + `asyncMap` (`seguimiento_service.dart`), `distinct()` (`conectividad_repository.dart`), `Isolate.run` (`etiquetado_service.dart`) |
@@ -95,7 +95,7 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 | Saber el estado del pedido, también con la app cerrada | Push (FCM) + notificaciones locales | `notificaciones_test.dart` (21) |
 | Cargar productos con una foto e IA | `ui/escaner`, `backend/src/ia.js` (Gemini) | `escaner_view_model_test.dart` (5) |
 | Fácil para clientes mayores | Barra de 3 botones, letra grande, botones de 56 dp | `widget_test.dart` |
-| 5.000 pedidos simultáneos sin pagar servidores | Incompatible; acordado un pico de 500 y probado | `backend/scripts/carga.mjs` |
+| 5.000 pedidos simultáneos sin pagar servidores | Incompatible; dimensionado para **100 por día y 100 por minuto** con tope en el servidor (`cupo.js`) y aviso claro en la app | `cupo.test.js` (5), "tope de 100 pedidos" (4), `carga.mjs` |
 
 ### Correcciones de la profesora (07/11)
 
@@ -127,7 +127,7 @@ release o en un iPhone.
 ## 5. Lo que queda (antes del 19/11)
 
 1. **Volver a correr las pruebas en la PC**, después de `git pull`:
-   `flutter analyze` y `flutter test` (deberían ser **158**). Es la única
+   `flutter analyze` y `flutter test` (deberían ser **162**). Es la única
    forma de confirmar los cambios de esta auditoría, porque acá no hay
    Flutter.
 2. **Volver a generar el APK** (`flutter build apk --release`), para que

@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freshmarket_app/data/repositories/pago_repository.dart';
+import 'package:freshmarket_app/data/services/api_client.dart';
+import 'package:freshmarket_app/domain/models/limite_de_pedidos.dart';
 import 'package:freshmarket_app/domain/models/metodo_pago.dart';
 import 'package:freshmarket_app/domain/models/pedido.dart';
 import 'package:freshmarket_app/domain/models/posicion.dart';
@@ -169,5 +171,65 @@ void main() {
 
     expect(viewModel.paso, PasoPago.sinConfirmar);
     expect(aprobado, isNull);
+  });
+
+  group('tope de 100 pedidos', () {
+    test('con los 100 del día cubiertos, avisa que vuelva mañana', () async {
+      crear();
+      service.rechazoAlCrear = const ApiException(
+        429,
+        '{"error":"Por hoy ya no tomamos más pedidos.","limite":"porDia"}',
+      );
+      viewModel.elegirMetodo(MetodoPago.debito);
+
+      await viewModel.pagar();
+
+      expect(viewModel.paso, PasoPago.sinLugar);
+      expect(viewModel.limite, LimiteDePedidos.porDia);
+      expect(checkout.abiertos, isEmpty, reason: 'no se abre Mercado Pago');
+      expect(aprobado, isNull);
+      expect(carrito.estaVacio, isFalse, reason: 'el carrito se conserva');
+    });
+
+    test('con muchos pedidos en el mismo minuto, deja probar de nuevo',
+        () async {
+      crear();
+      service.rechazoAlCrear = const ApiException(
+        429,
+        '{"error":"Probá en un minuto.","limite":"porMinuto"}',
+      );
+      viewModel.elegirMetodo(MetodoPago.debito);
+
+      await viewModel.pagar();
+      expect(viewModel.paso, PasoPago.sinLugar);
+      expect(viewModel.limite, LimiteDePedidos.porMinuto);
+
+      service.rechazoAlCrear = null;
+      viewModel.volverAElegir();
+      await viewModel.pagar();
+      await esperarResultado();
+
+      expect(viewModel.paso, PasoPago.aprobado);
+    });
+
+    test('un 429 que no se entiende se toma como el del minuto', () async {
+      crear();
+      service.rechazoAlCrear = const ApiException(429, 'Too Many Requests');
+      viewModel.elegirMetodo(MetodoPago.debito);
+
+      await viewModel.pagar();
+
+      expect(viewModel.limite, LimiteDePedidos.porMinuto);
+    });
+
+    test('otro error del servidor sigue siendo un error', () async {
+      crear();
+      service.rechazoAlCrear = const ApiException(500, 'falla');
+      viewModel.elegirMetodo(MetodoPago.debito);
+
+      await viewModel.pagar();
+
+      expect(viewModel.paso, PasoPago.error);
+    });
   });
 }

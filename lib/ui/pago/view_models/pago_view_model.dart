@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/pago_repository.dart';
+import '../../../domain/models/limite_de_pedidos.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/pedido.dart';
 import '../../../domain/models/posicion.dart';
@@ -17,6 +18,9 @@ enum PasoPago {
   aprobado,
   rechazado,
   sinConfirmar,
+
+  /// El almacén llegó a su tope de pedidos (ver [PagoViewModel.limite]).
+  sinLugar,
   error,
 }
 
@@ -54,6 +58,7 @@ class PagoViewModel extends ChangeNotifier {
   Pedido? _pedido;
   StreamSubscription<ResultadoPago>? _suscripcion;
   bool _descartado = false;
+  LimiteDePedidos? _limite;
 
   MetodoPago? get metodoElegido => _metodo;
   String get direccion => _direccion;
@@ -62,6 +67,9 @@ class PagoViewModel extends ChangeNotifier {
   bool get esEfectivo => _metodo == MetodoPago.efectivo;
   PasoPago get paso => _paso;
   Pedido? get pedido => _pedido;
+
+  /// Qué tope se alcanzó, si el paso es [PasoPago.sinLugar].
+  LimiteDePedidos? get limite => _limite;
 
   bool get puedePagar =>
       _metodo != null && !faltaDireccion && _paso == PasoPago.eligiendo;
@@ -103,6 +111,11 @@ class PagoViewModel extends ChangeNotifier {
     final Pedido pedido;
     try {
       pedido = await _repositorio.iniciarPago(armado);
+    } on SinLugarParaPedidos catch (sinLugar) {
+      // Va antes que `on Exception`: es un tope acordado, no una falla.
+      _limite = sinLugar.limite;
+      _cambiarPaso(PasoPago.sinLugar);
+      return;
     } on Exception {
       _cambiarPaso(PasoPago.error);
       return;

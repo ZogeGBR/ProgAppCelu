@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
+import '../../domain/models/limite_de_pedidos.dart';
 import '../../domain/models/metodo_pago.dart';
 import '../../domain/models/pedido.dart';
 import '../../domain/models/resultado_pago.dart';
+import '../services/api_client.dart';
 import '../services/pago_service.dart';
 
 /// Cobra un pedido con Mercado Pago.
@@ -42,8 +45,19 @@ class PagoRepository {
   /// cada celular, dos clientes tendrían el mismo. Sin backend (demo) queda
   /// el número local. En efectivo el pedido ya queda confirmado: se paga al
   /// recibir.
+  ///
+  /// Si el almacén llegó a su tope (100 pedidos por día o por minuto), el
+  /// servidor responde 429 y se lanza [SinLugarParaPedidos]: la capa de
+  /// datos traduce el código HTTP a algo del dominio, y el ViewModel nunca
+  /// ve un `ApiException`.
   Future<Pedido> iniciarPago(Pedido pedido) async {
-    final preferencia = await _service.crearPreferencia(pedido.toJson());
+    final Map<String, dynamic> preferencia;
+    try {
+      preferencia = await _service.crearPreferencia(pedido.toJson());
+    } on ApiException catch (error) {
+      if (error.codigo == 429) throw SinLugarParaPedidos(_limiteDe(error));
+      rethrow;
+    }
     final url = preferencia['urlCheckout'] as String?;
     if (url != null) {
       final seAbrio = await _checkout.abrir(Uri.parse(url));
@@ -70,6 +84,21 @@ class PagoRepository {
     final resultado = ResultadoPago.desdeTexto(datos['estado'] as String);
     if (resultado == ResultadoPago.aprobado) _confirmar(pedido);
     return resultado;
+  }
+
+  /// El servidor dice qué tope se alcanzó (`{"limite": "porDia"}`). Si no
+  /// se entiende la respuesta, se asume el del minuto: "probá en un minuto"
+  /// nunca deja a nadie esperando hasta mañana por error.
+  static LimiteDePedidos _limiteDe(ApiException error) {
+    try {
+      final cuerpo = jsonDecode(error.cuerpo);
+      if (cuerpo is Map && cuerpo['limite'] == 'porDia') {
+        return LimiteDePedidos.porDia;
+      }
+    } on FormatException {
+      // Respuesta que no es JSON: se usa el valor por defecto.
+    }
+    return LimiteDePedidos.porMinuto;
   }
 
   void _confirmar(Pedido pedido) {

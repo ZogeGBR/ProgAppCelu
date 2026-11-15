@@ -158,10 +158,24 @@ porque necesitan claves o una URL pública.
 Cada cliente simulado hace lo mismo que la app: catálogo, pedido, pago, estado
 y seguimiento, todos al mismo tiempo.
 
-| Clientes a la vez | Peticiones | Con error | Por segundo | Mediana | p95 |
-|---|---|---|---|---:|---:|
-| 500 | 2.500 | 0 | 730 | 631 ms | 1.021 ms |
-| 5.000 | 25.000 | 9.470 (38 %) | 652 | 7.677 ms | 13.463 ms |
+**Decisión (15/11): el sistema se dimensiona para 100 pedidos por día y 100
+por minuto.** Un almacén de barrio recibe hasta unos 100 pedidos por día, y
+el límite real son los repartidores: con dos bicicletas y 20 a 30 minutos
+por entrega salen unas 40 a 60 por día. Dimensionar para 500 o 5.000 es
+pagar un servidor que nunca se va a usar; con 100 alcanza uno chico y
+barato, que es lo que pidió Don Ceferino. El servidor hace cumplir el tope
+(`backend/src/cupo.js`, configurable con `MAX_PEDIDOS_POR_DIA` y
+`MAX_PEDIDOS_POR_MINUTO`): pasado el límite responde 429 y la app muestra
+"Por hoy ya no tomamos más pedidos" o "Probá en un minuto", sin cobrar.
+
+| Clientes a la vez | Peticiones | Con error | Sin lugar (tope) | Por segundo | Mediana | p95 |
+|---|---|---|---|---|---:|---:|
+| **100** (el tope) | 500 | **0** | 0 | 881 | 28 ms | 353 ms |
+| 150 (50 de más) | 600 | **0** | 50 | 831 | 78 ms | 585 ms |
+
+Con 150, los 100 primeros compran y a los otros 50 se les pide que prueben
+en un minuto: el servidor no se satura ni da errores. Antes de fijar el
+tope se había medido 500 (0 errores) y 5.000 (38 % de errores).
 
 Son mediciones en una sola PC, con cliente y servidor en la misma máquina, sin
 internet de por medio y sin esperar a Mercado Pago. Sirven para comparar y no
@@ -174,7 +188,7 @@ de carga. Falta repetirlo en el servidor real.
 |---|---|---|
 | Probar en un celular real, con Mercado Pago y Gemini reales | En el emulador se probó todo en modo simulado | Alta |
 | Publicar el backend con **https** | Mercado Pago necesita una URL pública para avisar los pagos y volver a la app. Hace falta contratar un servidor | Alta |
-| **Volumen de pedidos: 5.000 simultáneos sin pagar servidores** | Don Ceferino pidió 5.000 en Nochebuena sin costo, y esas dos cosas son incompatibles. Con la profesora acordamos que un almacén de barrio no llega a ese número y que el pico realista es de **hasta 500**. Hay que presentarle ese número a Don Ceferino, con el costo de un servidor chico, y medir en ese servidor (ver la prueba de carga) | Alta |
+| **Volumen de pedidos** | Don Ceferino pidió 5.000 simultáneos sin costo, y eso es incompatible. Se dimensionó para **100 por día y 100 por minuto**, con el tope en el servidor y probado (ver "Prueba de carga"). Falta presentarle ese número con el costo de un servidor chico y repetir la medición en ese servidor | Alta |
 | Mandar el GPS con la app cerrada o la pantalla apagada | Hoy el repartidor tiene que dejar la app abierta; falta el permiso de ubicación en segundo plano | Media |
 | Recuperar el pedido al reabrir la app | "Mi pedido" vive en memoria: si el cliente cierra la app, deja de ver el seguimiento (el pedido sigue en el servidor) | Media |
 | Avisar al cliente si cambió el precio o se acabó un producto de su carrito | El servidor cobra el precio actual y rechaza lo que no hay, pero la app solo muestra un error general | Media |

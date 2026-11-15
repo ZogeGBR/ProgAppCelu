@@ -18,6 +18,9 @@ const app = crearApp({
     .split(',')
     .map((nombre) => nombre.trim())
     .filter(Boolean),
+  // Cupo de pedidos (ver src/cupo.js): por defecto 100 por día y 100 por minuto.
+  maxPedidosPorDia: Number(process.env.MAX_PEDIDOS_POR_DIA ?? 100),
+  maxPedidosPorMinuto: Number(process.env.MAX_PEDIDOS_POR_MINUTO ?? 100),
   mpAccessToken: process.env.MP_ACCESS_TOKEN,
   mpSandbox: process.env.MP_SANDBOX === 'true',
   mpWebhookSecret: process.env.MP_WEBHOOK_SECRET,

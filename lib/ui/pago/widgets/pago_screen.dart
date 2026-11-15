@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/item_carrito.dart';
+import '../../../domain/models/limite_de_pedidos.dart';
 import '../../../domain/models/metodo_pago.dart';
 import '../../../domain/models/posicion.dart';
 import '../../../domain/models/ubicacion_entrega.dart';
@@ -109,6 +110,26 @@ class _PagoScreenState extends State<PagoScreen> {
                   textoBoton: 'Intentar otra vez',
                   onBoton: _viewModel.volverAElegir,
                 ),
+              PasoPago.sinLugar =>
+                _viewModel.limite == LimiteDePedidos.porDia
+                    ? VistaMensaje(
+                        icono: Icons.storefront,
+                        titulo: 'Por hoy ya no tomamos más pedidos.',
+                        detalle: 'Llegamos a los '
+                            '${LimiteDePedidos.maximoPorDia} pedidos del día, '
+                            'que es lo que podemos repartir. No se cobró '
+                            'nada. ¡Te esperamos mañana!',
+                        textoBoton: 'Volver',
+                        onBoton: () => Navigator.pop(context),
+                      )
+                    : VistaMensaje(
+                        icono: Icons.hourglass_top,
+                        titulo: 'Hay muchos pedidos en este momento.',
+                        detalle: 'No se cobró nada. Probá de nuevo en un '
+                            'minuto: tu carrito sigue guardado.',
+                        textoBoton: 'Probar de nuevo',
+                        onBoton: _viewModel.volverAElegir,
+                      ),
               PasoPago.error => VistaMensaje.error(
                   titulo: 'No pudimos conectar con Mercado Pago.',
                   onReintentar: _viewModel.volverAElegir,

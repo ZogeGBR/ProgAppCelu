@@ -117,9 +117,9 @@ sola al arrancar, o a mano con `cd backend && npm run bd:crear`.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 128 pruebas (ViewModels con fakes, Observer, avisos y pantallas)
-cd backend && npm test # backend: 44 pruebas (34 + 10 de notificaciones)
-node scripts/carga.mjs 500   # (desde backend/) prueba de carga
+flutter test           # app: 162 pruebas (ViewModels con fakes, Observer, avisos, pantallas, SQLite)
+cd backend && npm test # backend: 52 pruebas
+node scripts/carga.mjs 100   # (desde backend/) prueba de carga: 100 clientes a la vez
 ```
 
 > `dart format .` falla después de compilar porque entra a `build/`: por eso se
@@ -225,4 +225,4 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
 | "Saber en todo momento en qué estado está el pedido" (también con la app cerrada) | Notificaciones push: `NotificacionesRepository` + `backend/src/avisos.js` (`docs/NOTIFICACIONES.md`) |
 | Cargar productos sin saber de tecnología | `ui/escaner` + `backend/src/ia.js` (foto → etiqueta) |
 | Que sea fácil para clientes mayores | `ui/inicio` (barra de 3 botones) + `ui/core/tema.dart` |
-| 5.000 pedidos simultáneos en Nochebuena, sin pagar servidores | **Incompatibles.** Con la profesora acordamos un pico realista de hasta 500: ver `INFORME_MEJORAS.md`, secciones "Pruebas" y "Qué faltaría" |
+| 5.000 pedidos simultáneos en Nochebuena, sin pagar servidores | **Incompatibles.** Un almacén de barrio recibe hasta unos **100 pedidos por día** (el límite real son los repartidores en bici). El servidor se dimensiona para eso: **100 por día y 100 por minuto** (`backend/src/cupo.js`), probado sin errores, y alcanza un servidor chico y barato. Pasado el tope, la app avisa con un mensaje claro y no cobra nada. Ver `INFORME_MEJORAS.md`, "Prueba de carga" |

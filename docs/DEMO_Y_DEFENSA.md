@@ -31,7 +31,7 @@ Presentación del 19/11 · 10 minutos de demo + preguntas.
 | 7–8 | Zoe | "Volver a pedir" desde el historial (SQLite). Apagar el efectivo en el servidor (`FUNCIONES_APAGADAS=pagoEnEfectivo`), reabrir: ya no aparece | F1, D1 |
 | 8–10 | Zoe | Código: diagrama de capas, `Politicas`, `HistorialDao`, un test. Correr `flutter test` en vivo | C1–C4 |
 
-## 15 preguntas probables (con respuesta corta)
+## 16 preguntas probables (con respuesta corta)
 
 1. **¿Por qué MVVM y no MVC?** — Es la versión de MVC que usa Flutter: la
    vista *observa* al ViewModel (`ListenableBuilder` + `notifyListeners`), así
@@ -84,3 +84,11 @@ Presentación del 19/11 · 10 minutos de demo + preguntas.
     apagada (servicio en primer plano, permisos que Play revisa a mano),
     hosting con https para producción y publicación abierta en Play Store
     (quedó lista la prueba interna). Está en "Qué faltaría".
+16. **¿Cuántos pedidos aguanta? Don Ceferino pidió 5.000.** — 5.000
+    simultáneos sin pagar servidores es incompatible. Un almacén de barrio
+    recibe hasta unos 100 pedidos por día (el límite real son los
+    repartidores en bici), así que lo dimensionamos para **100 por día y 100
+    por minuto**: alcanza un servidor chico y barato. El tope lo hace
+    cumplir el servidor (`cupo.js`) y la app avisa "Por hoy ya no tomamos
+    más pedidos" o "Probá en un minuto", sin cobrar. Probado con 100
+    clientes a la vez: 0 errores.
