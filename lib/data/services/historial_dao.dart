@@ -131,7 +131,8 @@ class HistorialServiceMemoria implements HistorialService {
   @override
   Future<List<Map<String, Object?>>> ultimos({int limite = 20}) async {
     final ordenadas = _filas.values.toList()
-      ..sort((a, b) => (b['fecha']! as String).compareTo(a['fecha']! as String));
+      ..sort(
+          (a, b) => (b['fecha']! as String).compareTo(a['fecha']! as String));
     return ordenadas.take(limite).toList();
   }
 

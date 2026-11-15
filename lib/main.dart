@@ -32,7 +32,8 @@ Future<void> main() async {
   // Firebase usa canales de plataforma: hay que tener el motor listo antes.
   WidgetsFlutterBinding.ensureInitialized();
   final hayFirebase = await _iniciarFirebase();
-  final dependencias = Dependencias.desdeConfiguracion(hayFirebase: hayFirebase);
+  final dependencias =
+      Dependencias.desdeConfiguracion(hayFirebase: hayFirebase);
   // Chequeo "desde el servidor": qué funciones están prendidas. Si el
   // servidor no responde en 3 s, se sigue con todo prendido.
   final funciones = await dependencias.funciones.cargar();
@@ -201,9 +202,8 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
     final Widget? pantalla = switch (ajustes.name) {
       Rutas.ingresar => IngresarScreen(
           viewModel: _sesion,
-          pista: Politicas.muestraCuentasDeDemo
-              ? dependencias.pistaClaves
-              : null,
+          pista:
+              Politicas.muestraCuentasDeDemo ? dependencias.pistaClaves : null,
           crearRecuperacion: (email) => RecuperarClaveViewModel(
             repositorio: dependencias.sesion,
             email: email,

@@ -16,7 +16,8 @@ class Preferencias {
   static const clavePedidoEnCurso = 'pedido_en_curso_v1';
   static const claveUltimoAvisoEnSegundoPlano = 'ultimo_aviso_segundo_plano';
 
-  Future<String?> leer(String clave) => SharedPreferencesAsync().getString(clave);
+  Future<String?> leer(String clave) =>
+      SharedPreferencesAsync().getString(clave);
 
   Future<void> guardar(String clave, String valor) =>
       SharedPreferencesAsync().setString(clave, valor);

@@ -125,8 +125,7 @@ class Dependencias {
         servidor: AvisosServiceHttp(api),
       ),
       funciones: FuncionesRepository(service: FuncionesServiceHttp(api)),
-      conectividad:
-          ConectividadRepository(service: ConectividadServicePlus()),
+      conectividad: ConectividadRepository(service: ConectividadServicePlus()),
       recordatorios:
           RecordatoriosRepository(service: RecordatorioServicePlugin()),
       historial: HistorialRepository(service: _historialSegun(Politicas())),

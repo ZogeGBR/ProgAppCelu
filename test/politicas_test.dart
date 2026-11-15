@@ -81,8 +81,7 @@ void main() {
       expect(politicas.esCelular, isTrue);
     });
 
-    test('lee lo que manda el servidor; lo que falta queda prendido',
-        () async {
+    test('lee lo que manda el servidor; lo que falta queda prendido', () async {
       final repositorio = FuncionesRepository(
         service: const FuncionesServiceSimulado({'pagoEnEfectivo': false}),
       );

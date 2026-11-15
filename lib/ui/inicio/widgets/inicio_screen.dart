@@ -147,9 +147,8 @@ class InicioScreen extends StatelessWidget {
         ),
       Seccion.almacen => AlmacenScreen(
           viewModel: almacen,
-          alCargarConFoto: permiteCargaConFoto
-              ? () => _abrirCargaConFoto(context)
-              : null,
+          alCargarConFoto:
+              permiteCargaConFoto ? () => _abrirCargaConFoto(context) : null,
           alSalir: _salir,
         ),
       Seccion.repartir => RepartoScreen(viewModel: reparto, alSalir: _salir),

@@ -106,8 +106,7 @@ void main() {
     expect(find.byType(GridView), findsNothing);
   });
 
-  testWidgets('si el servidor apaga el efectivo, no se ofrece',
-      (tester) async {
+  testWidgets('si el servidor apaga el efectivo, no se ofrece', (tester) async {
     await abrirApp(
       tester,
       politicas: Politicas(funciones: const Funciones(pagoEnEfectivo: false)),
