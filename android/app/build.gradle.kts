@@ -79,6 +79,14 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
+// ML Kit (leer la foto del producto) trae una versión vieja de firebase-iid
+// que choca con la que ya incluye firebase-messaging ("Duplicate class
+// com.google.firebase.iid.FirebaseInstanceIdReceiver"). Se excluye la vieja:
+// firebase-messaging ya tiene esa clase, así que no se pierde nada.
+configurations.all {
+    exclude(group = "com.google.firebase", module = "firebase-iid")
+}
+
 // Notificaciones push: el archivo google-services.json se baja de la consola
 // de Firebase (ver docs/NOTIFICACIONES.md). Sin él la app compila igual y
 // funciona sin push, así nadie del grupo queda trabado por no tenerlo.
