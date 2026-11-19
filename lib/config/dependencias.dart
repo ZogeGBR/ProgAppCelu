@@ -17,6 +17,7 @@ import '../data/services/camara_service.dart';
 import '../data/services/carrito_local_service.dart';
 import '../data/services/catalogo_service.dart';
 import '../data/services/conectividad_service.dart';
+import '../data/services/etiquetado_dispositivo_service.dart';
 import '../data/services/etiquetado_service.dart';
 import '../data/services/funciones_service.dart';
 import '../data/services/geocodificacion_service.dart';
@@ -27,6 +28,7 @@ import '../data/services/pedido_local_service.dart';
 import '../data/services/push_service.dart';
 import '../data/services/recordatorio_service.dart';
 import '../data/services/reparto_service.dart';
+import '../data/services/ruta_service.dart';
 import '../data/services/seguimiento_service.dart';
 import '../data/services/sesion_service.dart';
 import '../data/services/ubicacion_service.dart';
@@ -82,7 +84,17 @@ class Dependencias {
   /// [hayFirebase]: si Firebase arrancó (ver main.dart). Sin Firebase la app
   /// anda igual, pero sin notificaciones push del backend.
   factory Dependencias.desdeConfiguracion({bool hayFirebase = false}) {
-    if (!AppConfig.usaBackend) return Dependencias.simuladas();
+    if (!AppConfig.usaBackend) {
+      // Demo sin servidor propio, pero con datos REALES donde no hace falta
+      // ninguna clave: la calle del punto del mapa (OpenStreetMap), el
+      // camino de la bici por las calles (OSRM) y la lectura de la foto en
+      // el celular (ML Kit). Si no hay internet, cada uno tiene su plan B.
+      return Dependencias.simuladas(
+        geocodificacionService: GeocodificacionServiceNominatim(),
+        rutaService: RutaServiceOsrm(),
+        etiquetadoService: EtiquetadoServiceDispositivo(),
+      );
+    }
 
     final api = ApiClient(urlBase: AppConfig.urlBackend);
     final catalogo = CatalogoRepository(service: CatalogoServiceHttp(api));
@@ -152,6 +164,7 @@ class Dependencias {
     ConectividadService? conectividadService,
     RecordatorioService? recordatorioService,
     HistorialService? historialService,
+    RutaService? rutaService,
     Duration intervaloPago = const Duration(seconds: 1),
   }) {
     // El "servidor" de la demo manda los avisos por este push simulado.
@@ -162,7 +175,8 @@ class Dependencias {
       ),
       seguimiento: SeguimientoRepository(
         service:
-            seguimientoService ?? SeguimientoServiceSimulado(push: pushDemo),
+            seguimientoService ??
+                SeguimientoServiceSimulado(push: pushDemo, rutas: rutaService),
         guardado: pedidoLocalService ?? const PedidoLocalServicePreferencias(),
       ),
       etiquetado: EtiquetadoRepository(

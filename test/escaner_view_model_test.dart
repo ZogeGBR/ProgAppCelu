@@ -36,8 +36,20 @@ void main() {
 
     expect(viewModel.paso, PasoEscaner.revisando);
     expect(viewModel.ficha?.nombre, 'Aceite de girasol 1.5L');
-    expect(viewModel.ficha?.precio, 3200);
     expect(catalogo.guardados, isEmpty);
+  });
+
+  test('el precio no viene de la foto: lo pone el dueño', () async {
+    // Aunque la IA sugiera un precio (la simulada sugiere 3200), la ficha
+    // arranca sin precio y no se puede guardar hasta que el dueño lo pone.
+    await viewModel.sacarFoto();
+
+    expect(viewModel.ficha?.precio, 0);
+    expect(viewModel.puedeGuardar, isFalse);
+
+    viewModel.cambiarPrecio('2.990');
+    expect(viewModel.ficha?.precio, 2990);
+    expect(viewModel.puedeGuardar, isTrue);
   });
 
   test('si cancela la cámara no pasa nada', () async {

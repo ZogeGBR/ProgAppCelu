@@ -61,9 +61,16 @@ flutter pub get
 flutter run
 ```
 
-Sin configuración, todo funciona **simulado**: catálogo de ejemplo, pago
-que se aprueba solo, repartidor que recorre el centro de Mendoza y una IA
-que devuelve una etiqueta de ejemplo. La cámara y el GPS sí son reales.
+Sin configuración no hace falta servidor propio: el catálogo y el pago son
+de ejemplo (el pago se aprueba solo), pero lo que se puede hacer gratis y sin
+claves usa **datos reales**:
+
+| Qué | Cómo | Sin internet |
+| --- | --- | --- |
+| La calle del punto que se toca en el mapa | Nominatim (OpenStreetMap), desde el celular | Se escribe a mano |
+| La bici del repartidor | Sale del almacén (**Gutiérrez 746, Ciudad de Mendoza**) y va **por las calles** (ruta de OSRM), animada | Va en línea recta |
+| Cargar un producto con una foto | ML Kit **en el celular**: lee el texto del envase y reconoce lo que se ve. El precio lo pone el dueño | Funciona igual (no usa internet) |
+| Cámara y GPS | Los del celular | — |
 
 Para entrar como dueño o repartidor: ícono del almacén arriba a la derecha en
 "Comprar", email `dueno@freshmarket.com` o `repartidor@freshmarket.com`,
@@ -117,7 +124,7 @@ sola al arrancar, o a mano con `cd backend && npm run bd:crear`.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 162 pruebas (ViewModels con fakes, Observer, avisos, pantallas, SQLite)
+flutter test           # app: 180 pruebas (ViewModels con fakes, Observer, avisos, pantallas, SQLite)
 cd backend && npm test # backend: 52 pruebas
 node scripts/carga.mjs 100   # (desde backend/) prueba de carga: 100 clientes a la vez
 ```

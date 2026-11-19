@@ -18,8 +18,10 @@ class EtiquetadoRepository {
   Future<Uint8List?> tomarFoto({bool deGaleria = false}) =>
       _camara.tomarFoto(deGaleria: deGaleria);
 
+  /// La foto propone nombre, categoría y descripción. El precio NO: lo
+  /// pone siempre el dueño (aunque la IA del servidor sugiera uno).
   Future<FichaProducto> armarFicha(Uint8List foto) async {
     final datos = await _etiquetado.analizarFoto(foto);
-    return FichaProducto.fromJson(datos);
+    return FichaProducto.fromJson(datos).copiarCon(precio: 0);
   }
 }

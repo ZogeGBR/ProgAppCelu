@@ -75,6 +75,7 @@ void main() {
       addTearDown(escaner.dispose);
 
       await escaner.sacarFoto();
+      escaner.cambiarPrecio('3200'); // El precio lo pone el dueño.
       await escaner.guardar();
 
       const nombre = 'Aceite de girasol 1.5L';

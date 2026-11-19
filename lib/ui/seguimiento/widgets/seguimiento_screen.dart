@@ -92,6 +92,7 @@ class SeguimientoScreen extends StatelessWidget {
                     child: MapaRepartidor(
                       repartidor: posicion,
                       destino: viewModel.destino,
+                      ruta: viewModel.ruta,
                     ),
                   ),
                 ),

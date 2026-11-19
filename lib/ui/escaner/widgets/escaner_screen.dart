@@ -8,8 +8,8 @@ import '../view_models/escaner_view_model.dart';
 
 /// Sección del dueño: "Cargar producto con una foto".
 ///
-/// Don Ceferino no tiene que escribir nada: saca la foto, la IA arma la
-/// etiqueta y él solo revisa el precio y toca "Guardar producto".
+/// Don Ceferino saca la foto, la app lee el envase y arma la etiqueta, y
+/// él pone el precio y toca "Guardar producto".
 class EscanerScreen extends StatelessWidget {
   const EscanerScreen({super.key, required this.viewModel});
 
@@ -69,8 +69,8 @@ class _Inicio extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'La app reconoce qué es y arma la etiqueta sola. '
-          'Vos solo revisás el precio.',
+          'La app lee el envase y arma la etiqueta sola. '
+          'Vos ponés el precio.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 32),
@@ -197,7 +197,7 @@ class _Revision extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'Precio',
                   prefixText: '\$ ',
-                  helperText: 'Es un precio sugerido: poné el tuyo.',
+                  helperText: 'El precio lo ponés vos.',
                   border: OutlineInputBorder(),
                 ),
               ),

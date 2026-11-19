@@ -1,6 +1,12 @@
+import 'dart:async';
+
+import '../../domain/models/almacen.dart';
 import '../../domain/models/aviso.dart';
+import '../../domain/models/posicion.dart';
+import '../../domain/models/recorrido.dart';
 import 'api_client.dart';
 import 'push_service.dart';
+import 'ruta_service.dart';
 
 /// Fuente de las novedades de un pedido: etapa y posición del
 /// repartidor en bicicleta. Emite datos crudos cada vez que algo cambia.
@@ -42,6 +48,11 @@ class SeguimientoServiceHttp implements SeguimientoService {
 
 /// Simula un reparto en bicicleta por el centro de Mendoza.
 ///
+/// La bici sale siempre del almacén de Don Ceferino (Gutiérrez 746) y va
+/// hasta el punto que marcó el cliente POR LAS CALLES: con [rutas] pide el
+/// camino real a OSRM. Mientras la ruta no llega (o si no hay internet) usa
+/// la línea recta, así el seguimiento nunca se traba.
+///
 /// Usa Stream.periodic (y no un async* con Future.delayed) para que al
 /// cancelar la suscripción no quede ningún Timer colgado.
 ///
@@ -52,27 +63,49 @@ class SeguimientoServiceSimulado implements SeguimientoService {
     this.intervalo = const Duration(seconds: 2),
     this.pasosEnCamino = 10,
     this.push,
+    this.rutas,
+    this.origen = Almacen.ubicacion,
   });
 
   final Duration intervalo;
   final int pasosEnCamino;
   final PushServiceSimulado? push;
+  final RutaService? rutas;
+  final Posicion origen;
 
-  static const _almacen = (lat: -32.8895, lng: -68.8458);
-  static const _cliente = (lat: -32.8805, lng: -68.8335);
-  static const _minutosDeViaje = 12;
+  static const _cliente = Posicion(latitud: -32.8805, longitud: -68.8335);
+
+  // Una bici en el centro anda a unos 15 km/h: 250 metros por minuto.
+  static const _metrosPorMinuto = 250.0;
 
   @override
   Stream<Map<String, dynamic>> seguirPedido(
     String pedidoId, {
     Map<String, dynamic>? destino,
   }) {
-    final punto = destino ?? {'lat': _cliente.lat, 'lng': _cliente.lng};
+    final hasta = destino == null ? _cliente : Posicion.fromJson(destino);
+    final punto = hasta.toJson();
+
+    // Mientras se pide la ruta por las calles, la bici todavía está en el
+    // almacén (recibido y en preparación): cuando sale, ya está.
+    var recorrido = Recorrido.recto(origen, hasta);
+    final rutas = this.rutas;
+    if (rutas != null) {
+      unawaited(
+        rutas.rutaEntre(origen, hasta).then(
+          (ruta) {
+            if (ruta.esValido) recorrido = ruta;
+          },
+          onError: (Object _) {}, // Sin internet: sigue en línea recta.
+        ),
+      );
+    }
+
     // recibido, en preparación, los pasos en camino y entregado.
     final totalEventos = pasosEnCamino + 3;
     return Stream.periodic(intervalo, (indice) {
       _avisarSiCorresponde(indice, pedidoId);
-      return _evento(indice, punto);
+      return _evento(indice, punto, recorrido);
     }).take(totalEventos);
   }
 
@@ -100,35 +133,31 @@ class SeguimientoServiceSimulado implements SeguimientoService {
     }
   }
 
-  Map<String, dynamic> _evento(int indice, Map<String, dynamic> destino) {
+  Map<String, dynamic> _evento(
+    int indice,
+    Map<String, dynamic> destino,
+    Recorrido recorrido,
+  ) {
     if (indice == 0) return {'estado': 'recibido'};
     if (indice == 1) return {'estado': 'enPreparacion'};
 
+    final ruta = [for (final punto in recorrido.puntos) punto.toJson()];
     final paso = indice - 2;
     if (paso >= pasosEnCamino) {
-      return {'estado': 'entregado', 'destino': destino};
+      return {'estado': 'entregado', 'destino': destino, 'ruta': ruta};
     }
-    final avance = paso / (pasosEnCamino - 1);
+    final avance = pasosEnCamino == 1 ? 1.0 : paso / (pasosEnCamino - 1);
+    final minutosDeViaje =
+        (recorrido.largoMetros / _metrosPorMinuto).ceil().clamp(1, 90);
+    final posicion = recorrido.puntoEnFraccion(avance);
     return {
       'estado': 'enCamino',
-      'repartidor': _repartidorEn(avance, destino),
+      'repartidor': {'nombre': 'Tobías', ...posicion.toJson()},
       'destino': destino,
+      'ruta': ruta,
       // Mientras no llegó, nunca dice "0 min".
       'minutosEstimados':
-          ((1 - avance) * _minutosDeViaje).ceil().clamp(1, _minutosDeViaje),
-    };
-  }
-
-  Map<String, dynamic> _repartidorEn(
-    double avance,
-    Map<String, dynamic> destino,
-  ) {
-    final lat = destino['lat'] as double;
-    final lng = destino['lng'] as double;
-    return {
-      'nombre': 'Tobías',
-      'lat': _almacen.lat + (lat - _almacen.lat) * avance,
-      'lng': _almacen.lng + (lng - _almacen.lng) * avance,
+          ((1 - avance) * minutosDeViaje).ceil().clamp(1, minutosDeViaje),
     };
   }
 }

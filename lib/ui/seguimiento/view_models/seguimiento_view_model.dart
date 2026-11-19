@@ -43,6 +43,9 @@ class SeguimientoViewModel extends ChangeNotifier {
   String? get nombreRepartidor => _seguimiento?.nombreRepartidor;
   int? get minutosEstimados => _seguimiento?.minutosEstimados;
 
+  /// El camino por las calles que sigue la bici (vacío si no se conoce).
+  List<Posicion> get ruta => _seguimiento?.ruta ?? const [];
+
   /// El mapa se muestra solo mientras la bici está en camino.
   bool get mostrarMapa =>
       estado == EstadoPedido.enCamino && posicionRepartidor != null;

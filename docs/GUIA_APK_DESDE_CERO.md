@@ -124,7 +124,7 @@ flutter test
 | Comando | Resultado esperado |
 |---|---|
 | `flutter analyze` | `No issues found!` |
-| `flutter test` | `All tests passed!` (162 pruebas) |
+| `flutter test` | `All tests passed!` (180 pruebas) |
 
 En `flutter test` aparecen algunos mensajes como "No se pudo anotar el
 celular para los avisos": son pruebas que simulan errores **a propósito**.
@@ -148,9 +148,11 @@ flutter build apk --release
 √ Built build\app\outputs\flutter-apk\app-release.apk (55.1MB)
 ```
 
-Esa versión es el **modo demo**: todo simulado (pagos, repartidor, IA),
-sin servidor y sin internet, con cuentas de prueba. Es la más segura para
-presentar. La cámara, el GPS, el mapa y las notificaciones son reales.
+Esa versión es el **modo demo**: sin servidor propio y con cuentas de
+prueba (el catálogo y el pago son de ejemplo). La cámara, el GPS, el mapa y
+las notificaciones son reales; con internet, también la calle del punto
+marcado en el mapa y la bici que va por las calles desde Gutiérrez 746. La
+foto del producto se lee en el celular (ML Kit): el precio lo pone el dueño.
 
 ## Paso 9. Preparar el celular
 
@@ -200,13 +202,13 @@ vez. Cuentas de la demo (aparecen también en la pantalla de ingreso):
 | 01 | Mirar el escritorio del celular y abrir la app | Ícono de FreshMarket y pantalla de arranque con el logo |
 | 02 | Mantener apretado (o tocar) un producto | Se abre el detalle desde abajo, con "Agregar al carrito" |
 | 03 | Carrito: deslizar un renglón hacia el costado | Se quita y aparece "Deshacer" |
-| 04 | Pagar (marcar la casa en el mapa con "Usar mi ubicación") | El mapa se centra donde estás y escribe la calle |
-| 05 | "Mi pedido" después de pagar | Mapa con la bici del repartidor moviéndose |
+| 04 | Pagar (marcar la casa en el mapa con "Usar mi ubicación") | El mapa se centra donde estás y escribe la calle real |
+| 05 | "Mi pedido" después de pagar | La bici sale de Gutiérrez 746 y avanza por las calles hasta tu casa |
 | 06 | Esperar unos segundos con la app minimizada | Notificación "Tu pedido está en camino"; al tocarla abre "Mi pedido" |
 | 07 | "Mi pedido" → historial | Pedido anterior con **"Volver a pedir"** |
 | 08 | Activar **modo avión** | Aviso "Sin internet" arriba |
 | 09 | Girar el celular (acostado) | Nada se corta |
-| 10 | Ingresar como dueño → "Mi almacén" → "Cargar producto con una foto" | Abre la cámara de verdad y la IA propone nombre y precio |
+| 10 | Ingresar como dueño → "Mi almacén" → "Cargar producto con una foto" | Abre la cámara de verdad, lee el envase y propone nombre y categoría; el precio lo ponés vos |
 | 11 | Negar un permiso (ubicación o notificaciones) | La app no se cae y explica qué falta |
 | 12 | Ajustes del celular → tamaño de letra al máximo | Todo se sigue leyendo |
 

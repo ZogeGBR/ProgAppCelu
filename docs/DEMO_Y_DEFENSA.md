@@ -12,8 +12,10 @@ Presentación del 19/11 · 10 minutos de demo + preguntas.
       historial (hacer una compra el día antes) y la cuenta del dueño
       creada.
 - [ ] **Plan B sin internet**: el APK de la demo (compilado sin
-      `URL_BACKEND`) funciona todo simulado. Si falla el Wi-Fi del aula, se
-      sigue con ese sin cortar el guion.
+      `URL_BACKEND`) no necesita servidor propio. Con internet muestra la
+      calle real del mapa y la bici por las calles; sin internet, la
+      dirección se escribe a mano y la bici va en línea recta. La foto del
+      producto se lee en el celular y anda igual sin internet.
 - [ ] `flutter test` y `npm test` corridos esa mañana (captura en el celular
       por si lo piden).
 - [ ] Proyector: la app en el celular espejada (scrcpy o Android Studio) y
