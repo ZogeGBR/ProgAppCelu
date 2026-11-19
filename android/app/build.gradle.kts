@@ -61,6 +61,11 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // Reglas propias para R8 (ver proguard-rules.pro).
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
