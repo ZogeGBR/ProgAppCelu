@@ -52,15 +52,18 @@ class SeguimientoViewModel extends ChangeNotifier {
 
   /// Retoma el pedido que se estaba siguiendo antes de cerrar la app (se
   /// llama al abrirla). Si ya se está siguiendo otro, no lo pisa.
+  ///
+  /// Sigue desde donde iba: no vuelve a avisar "en camino" ni "llegó" de un
+  /// pedido que ya pasó por esas etapas.
   Future<void> restaurar() async {
-    final Pedido? guardado;
+    final PedidoGuardado? guardado;
     try {
       guardado = await _repositorio.pedidoGuardado();
     } on Exception {
       return; // Sin pedido guardado: "Mi pedido" arranca vacío.
     }
     if (guardado == null || _pedido != null || _descartado) return;
-    _empezar(guardado);
+    _empezar(guardado.pedido, desde: guardado.desde);
   }
 
   /// Empieza a seguir un pedido recién pagado y lo guarda en el celular.
@@ -69,13 +72,13 @@ class SeguimientoViewModel extends ChangeNotifier {
     _sinFrenar(_repositorio.recordar(pedido));
   }
 
-  void _empezar(Pedido pedido) {
+  void _empezar(Pedido pedido, {DateTime? desde}) {
     _cancelarSuscripcion();
     _pedido = pedido;
     _seguimiento = const SeguimientoPedido(estado: EstadoPedido.recibido);
     _sinConexion = false;
     _suscripcion = _repositorio
-        .seguir(pedido)
+        .seguir(pedido, desde: desde)
         .listen(_alRecibirNovedad, onError: _alFallar);
     notifyListeners();
   }

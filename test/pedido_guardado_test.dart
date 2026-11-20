@@ -69,6 +69,8 @@ void main() {
     expect(otraVez.pedido?.id, pedido.id);
     expect(otraVez.pedido?.numero, 2057);
     expect(otraVez.estado, EstadoPedido.recibido);
+    // Le pasa al servicio desde cuándo se seguía, para no empezar de cero.
+    expect(servicio.ultimoDesde, isNotNull);
 
     // Y vuelve a escuchar al repartidor.
     servicio.emitir({'estado': 'enPreparacion'});

@@ -226,12 +226,15 @@ class SeguimientoServiceFalso implements SeguimientoService {
   Stream<Map<String, dynamic>> seguirPedido(
     String pedidoId, {
     Map<String, dynamic>? destino,
+    DateTime? desde,
   }) {
     ultimoDestino = destino;
+    ultimoDesde = desde;
     return _controlador.stream;
   }
 
   Map<String, dynamic>? ultimoDestino;
+  DateTime? ultimoDesde;
 }
 
 class CamaraFalsa implements CamaraService {

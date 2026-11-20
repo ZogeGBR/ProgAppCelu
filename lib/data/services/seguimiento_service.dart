@@ -13,9 +13,14 @@ import 'ruta_service.dart';
 abstract interface class SeguimientoService {
   /// [destino] es el punto que marcó el cliente (`{'lat': ..., 'lng': ...}`),
   /// si marcó alguno.
+  ///
+  /// [desde] es cuándo se empezó a seguir el pedido. Llega al retomarlo
+  /// (al abrir la app de nuevo): así el reparto sigue desde donde iba y no
+  /// vuelve a empezar de cero.
   Stream<Map<String, dynamic>> seguirPedido(
     String pedidoId, {
     Map<String, dynamic>? destino,
+    DateTime? desde,
   });
 }
 
@@ -37,8 +42,10 @@ class SeguimientoServiceHttp implements SeguimientoService {
   Stream<Map<String, dynamic>> seguirPedido(
     String pedidoId, {
     Map<String, dynamic>? destino,
+    DateTime? desde,
   }) {
-    // El backend ya sabe el destino: se lo mandó la app al crear el pedido.
+    // El backend ya sabe el destino (se lo mandó la app al crear el pedido)
+    // y la etapa real: no necesita [desde].
     return Stream<void>.periodic(intervalo).asyncMap(
       (_) async => await _api.get('/pedidos/$pedidoId/seguimiento')
           as Map<String, dynamic>,
@@ -58,6 +65,11 @@ class SeguimientoServiceHttp implements SeguimientoService {
 ///
 /// Con [push], hace lo mismo que el backend real: cuando la bici sale y
 /// cuando llega, manda una notificación push (simulada).
+///
+/// Como un servidor de verdad, el reparto avanza con el reloj aunque la app
+/// esté cerrada: al retomar un pedido (con `desde`) arranca en la etapa que
+/// le toca y no repite los avisos que ya pasaron. Si ya llegó, solo dice
+/// "entregado", sin avisar de nuevo.
 class SeguimientoServiceSimulado implements SeguimientoService {
   const SeguimientoServiceSimulado({
     this.intervalo = const Duration(seconds: 2),
@@ -65,6 +77,7 @@ class SeguimientoServiceSimulado implements SeguimientoService {
     this.push,
     this.rutas,
     this.origen = Almacen.ubicacion,
+    this.ahora = DateTime.now,
   });
 
   final Duration intervalo;
@@ -72,6 +85,9 @@ class SeguimientoServiceSimulado implements SeguimientoService {
   final PushServiceSimulado? push;
   final RutaService? rutas;
   final Posicion origen;
+
+  /// El reloj (las pruebas lo reemplazan para no tener que esperar).
+  final DateTime Function() ahora;
 
   static const _cliente = Posicion(latitud: -32.8805, longitud: -68.8335);
 
@@ -82,6 +98,7 @@ class SeguimientoServiceSimulado implements SeguimientoService {
   Stream<Map<String, dynamic>> seguirPedido(
     String pedidoId, {
     Map<String, dynamic>? destino,
+    DateTime? desde,
   }) {
     final hasta = destino == null ? _cliente : Posicion.fromJson(destino);
     final punto = hasta.toJson();
@@ -101,12 +118,42 @@ class SeguimientoServiceSimulado implements SeguimientoService {
       );
     }
 
-    // recibido, en preparación, los pasos en camino y entregado.
-    final totalEventos = pasosEnCamino + 3;
-    return Stream.periodic(intervalo, (indice) {
+    // Eventos: recibido (0), en preparación (1), los pasos en camino y
+    // entregado (el último).
+    final ultimo = pasosEnCamino + 2;
+    Map<String, dynamic> evento(int indice) =>
+        _evento(indice, punto, recorrido);
+
+    final inicial = _primerEventoPendiente(desde);
+    // Llegó mientras la app estaba cerrada: ya se avisó, no se repite.
+    if (inicial > ultimo) return Stream.value(evento(ultimo));
+
+    final enVivo = Stream.periodic(intervalo, (vuelta) {
+      final indice = inicial + vuelta;
       _avisarSiCorresponde(indice, pedidoId);
-      return _evento(indice, punto, recorrido);
-    }).take(totalEventos);
+      return evento(indice);
+    }).take(ultimo - inicial + 1);
+    if (inicial == 0) return enVivo;
+
+    // Retoma: primero muestra dónde iba (sin avisar) y sigue desde ahí.
+    return _retomar(evento(inicial - 1), enVivo);
+  }
+
+  /// El primer evento que todavía no pasó, contando desde [desde].
+  /// Sin [desde] (pedido recién pagado) es el primero de todos.
+  int _primerEventoPendiente(DateTime? desde) {
+    if (desde == null || intervalo <= Duration.zero) return 0;
+    final pasado = ahora().difference(desde);
+    if (pasado.isNegative) return 0;
+    return pasado.inMicroseconds ~/ intervalo.inMicroseconds;
+  }
+
+  static Stream<Map<String, dynamic>> _retomar(
+    Map<String, dynamic> dondeIba,
+    Stream<Map<String, dynamic>> resto,
+  ) async* {
+    yield dondeIba;
+    yield* resto;
   }
 
   // Igual que el backend (avisos.js): un aviso al salir y otro al llegar,
