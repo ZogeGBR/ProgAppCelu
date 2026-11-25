@@ -2,7 +2,11 @@
 
 Este documento muestra **cada clase en su capa**, cómo se conectan, el
 modelo de datos SQL y cómo se recorre el ciclo completo de una acción.
-Los diagramas están en Mermaid: GitHub y VS Code los dibujan solos.
+Los diagramas están en Mermaid: GitHub y VS Code los dibujan solos. Las
+mismas figuras, ya dibujadas, están en [`diagramas/`](diagramas/):
+`capas.png`, `clases.png`, `modelos.png`, `secuencia_mapa.png`,
+`base_de_datos.png` (servidor), `base_celular.png` (celular),
+`secuencia_camara.png` y `presentacion_final.png`.
 
 ## 1. Capas
 
@@ -13,14 +17,17 @@ flowchart TB
         VM["ViewModels (ChangeNotifier)<br/>estado + comandos"]
     end
     subgraph DATA["Capa de datos (lib/data)"]
-        R["Repositorios<br/>JSON → modelo, caché, reintentos, esperas"]
-        S["Servicios (interfaces + implementaciones)<br/>red, GPS, cámara, disco; sin estado"]
+        R["Repositorios<br/>JSON o filas → modelo, caché, reintentos, esperas"]
+        S["Servicios (interfaces + implementaciones)<br/>red, GPS, cámara, ML Kit, SQLite, preferencias; sin estado"]
     end
-    subgraph DOM["Dominio (lib/domain/models)"]
-        M["Modelos puros e inmutables<br/>Producto, Pedido, Posicion..."]
+    subgraph DOM["Dominio (lib/domain)"]
+        M["models/: modelos puros e inmutables<br/>Producto, Pedido, ItemCarrito, Recorrido, Almacen, ErrorDeFoto..."]
+        P["politicas/: Politicas<br/>qué puede hacer este dispositivo"]
     end
     CFG["config/dependencias.dart<br/>arma todo (inyección de dependencias)"]
     BE[("Backend Node + SQLite<br/>backend/")]
+    CEL[("En el celular<br/>SQLite freshmarket.db + SharedPreferencesAsync")]
+    EXT[("Servicios gratis sin clave<br/>Nominatim · OSRM")]
 
     V -- "llama comandos" --> VM
     VM -- "notifyListeners() (Observer)" --> V
@@ -28,12 +35,27 @@ flowchart TB
     R -- "Stream de cambios (Observer)" --> VM
     R --> S
     S -- "HTTP" --> BE
+    S -- "HTTP (demo)" --> EXT
+    S -- "DAO / preferencias" --> CEL
     V -.usa.-> M
     VM -.usa.-> M
+    VM -.usa.-> P
     R -.crea.-> M
     CFG -.construye.-> R
     CFG -.construye.-> S
 ```
+
+`dependencias.dart` arma la app de **dos maneras** sin que ninguna
+pantalla se entere:
+
+| Modo | Cuándo | Qué servicios usa |
+|---|---|---|
+| **Con servidor** | `--dart-define=URL_BACKEND=...` | Los `...Http` (catálogo, pago, seguimiento, sesión, foto con Gemini, dirección con caché) contra el backend propio |
+| **Demo** (el APK de la defensa) | Sin `URL_BACKEND` | Los simulados para lo que necesita servidor (pago, pedidos), pero **datos reales** donde no hace falta clave: `GeocodificacionServiceNominatim` (la calle del punto), `RutaServiceOsrm` (el camino de la bici) y `EtiquetadoServiceDispositivo` (ML Kit lee la foto en el celular) |
+
+En los dos modos se crea **una sola** `BaseLocal` (un archivo SQLite para
+todas las tablas del celular), **una sola** `Preferencias` y **una sola**
+`Politicas`, y se pasan a quien las necesita.
 
 Reglas que se cumplen en todo el proyecto (y que se pueden verificar con
 `grep`):
@@ -119,7 +141,15 @@ classDiagram
       +cambiarClave(codigo, claveNueva, repetida)
     }
     class AlmacenViewModel
-    class EscanerViewModel
+    class EscanerViewModel {
+      -FichaProducto _ficha
+      -String _mensajeError
+      +estaOcupado bool
+      +sacarFoto(deGaleria)
+      +recuperarFotoPerdida()
+      +cambiarPrecio(String)
+      +guardar()
+    }
     class RepartoViewModel
     class AvisosViewModel {
       +permisoDenegado bool
@@ -132,7 +162,10 @@ classDiagram
       -List~Producto~ _cache
       +cambios Stream~List~
     }
-    class CarritoRepository
+    class CarritoRepository {
+      +guardar(List~ItemCarrito~)
+      +cargar() List~ItemCarrito~
+    }
     class PagoRepository {
       +pedidosConfirmados Stream~Pedido~
     }
@@ -148,11 +181,19 @@ classDiagram
       +direccionDe(Posicion) String
       +miPosicion() Posicion
     }
-    class SeguimientoRepository
+    class SeguimientoRepository {
+      +seguir(Pedido) Stream~SeguimientoPedido~
+      +recordar(Pedido)
+      +pedidoGuardado()
+    }
     class SesionRepository {
       +cambios Stream~Sesion~
     }
-    class EtiquetadoRepository
+    class EtiquetadoRepository {
+      +tomarFoto(deGaleria) Uint8List
+      +recuperarFotoPerdida() Uint8List
+      +armarFicha(foto) FichaProducto
+    }
     class RepartoRepository
 
     %% ---------- Servicios (interfaces) ----------
@@ -165,7 +206,16 @@ classDiagram
     class SeguimientoService {<<interface>>}
     class SesionService {<<interface>>}
     class EtiquetadoService {<<interface>>}
-    class CamaraService {<<interface>>}
+    class CamaraService {
+      <<interface>>
+      +tomarFoto(deGaleria) Uint8List
+      +recuperarPerdida() Uint8List
+    }
+    class RutaService {
+      <<interface>>
+      +rutaEntre(desde, hasta) Recorrido
+    }
+    class PedidoLocalService {<<interface>>}
     class RepartoService {<<interface>>}
     class PushService {<<interface>>}
     class NotificacionLocalService {<<interface>>}
@@ -230,6 +280,7 @@ classDiagram
     UbicacionEntregaRepository --> GeocodificacionService
     UbicacionEntregaRepository --> UbicacionService
     SeguimientoRepository --> SeguimientoService
+    SeguimientoRepository --> PedidoLocalService
     SesionRepository --> SesionService
     EtiquetadoRepository --> EtiquetadoService
     EtiquetadoRepository --> CamaraService
@@ -242,13 +293,17 @@ classDiagram
     %% Implementaciones (Strategy: real o simulada)
     CatalogoService <|.. CatalogoServiceHttp
     CatalogoService <|.. CatalogoServiceLocal
+    CarritoLocalService <|.. CarritoDao
     CarritoLocalService <|.. CarritoLocalServicePreferencias
     CarritoLocalService <|.. CarritoLocalServiceMemoria
+    PedidoLocalService <|.. PedidoLocalServicePreferencias
+    PedidoLocalService <|.. PedidoLocalServiceMemoria
     PagoService <|.. PagoServiceHttp
     PagoService <|.. PagoServiceSimulado
     CheckoutLauncher <|.. CheckoutLauncherExterno
     CheckoutLauncher <|.. CheckoutLauncherSimulado
     GeocodificacionService <|.. GeocodificacionServiceHttp
+    GeocodificacionService <|.. GeocodificacionServiceNominatim
     GeocodificacionService <|.. GeocodificacionServiceSimulado
     UbicacionService <|.. UbicacionServiceGeolocator
     SeguimientoService <|.. SeguimientoServiceHttp
@@ -256,8 +311,12 @@ classDiagram
     SesionService <|.. SesionServiceHttp
     SesionService <|.. SesionServiceSimulado
     EtiquetadoService <|.. EtiquetadoServiceHttp
+    EtiquetadoService <|.. EtiquetadoServiceDispositivo
     EtiquetadoService <|.. EtiquetadoServiceSimulado
+    EtiquetadoServiceDispositivo --> LectorDeEtiqueta : ML Kit lee el envase
     CamaraService <|.. CamaraServiceImagePicker
+    RutaService <|.. RutaServiceOsrm
+    RutaService <|.. RutaServiceRecta
     RepartoService <|.. RepartoServiceHttp
     RepartoService <|.. RepartoServiceSimulado
     PushService <|.. PushServiceFirebase
@@ -266,6 +325,7 @@ classDiagram
     AvisosService <|.. AvisosServiceHttp
     AvisosService <|.. AvisosServiceSimulado
     SeguimientoServiceSimulado --> PushServiceSimulado : manda avisos (demo)
+    SeguimientoServiceSimulado --> RutaService : camino de la bici (demo)
 
     CatalogoServiceHttp --> ApiClient
     PagoServiceHttp --> ApiClient
@@ -295,6 +355,7 @@ classDiagram
       +int cantidad
       +subtotal double
       +copiarCon(cantidad)
+      +toMap() fromMap()
     }
     class Pedido {
       +String id
@@ -316,7 +377,39 @@ classDiagram
     class SeguimientoPedido {
       +EstadoPedido estado
       +Posicion posicionRepartidor
+      +Posicion destino
+      +int minutosEstimados
+      +List~Posicion~ ruta
     }
+    class Recorrido {
+      +List~Posicion~ puntos
+      +largoMetros double
+      +puntoEnFraccion(f) Posicion
+      +distanciaMetros(a, b)$ double
+    }
+    class Almacen {
+      <<constantes>>
+      +direccion$ "Gutiérrez 746, Ciudad de Mendoza"
+      +ubicacion$ Posicion
+    }
+    class FichaProducto {
+      +String nombre
+      +String categoria
+      +double precio "lo pone el dueño"
+      +estaCompleta bool
+    }
+    class ErrorDeFoto {
+      <<Exception>>
+      +String mensaje
+    }
+    class LimiteDePedidos {<<enum>> porDia porMinuto}
+    class SinLugarParaPedidos {
+      <<Exception>>
+      +LimiteDePedidos limite
+    }
+    SinLugarParaPedidos --> LimiteDePedidos
+    Recorrido --> Posicion
+    Almacen --> Posicion
     class Sesion {
       +Rol rol
       +String token
@@ -353,7 +446,7 @@ sequenceDiagram
     participant V as ElegirUbicacionScreen
     participant VM as ElegirUbicacionViewModel
     participant R as UbicacionEntregaRepository
-    participant S as GeocodificacionServiceHttp
+    participant S as GeocodificacionService
     participant B as Backend /geo/inversa
     participant N as Nominatim (OpenStreetMap)
 
@@ -363,7 +456,7 @@ sequenceDiagram
     VM->>R: direccionDe(Posicion)
     alt ya consultada
         R-->>VM: dirección de la caché
-    else nueva
+    else nueva, con servidor (GeocodificacionServiceHttp)
         R->>S: direccionDe(lat, lng)
         S->>B: GET /geo/inversa?lat&lng
         B->>B: busca en direcciones_cache (SQL)
@@ -371,8 +464,15 @@ sequenceDiagram
         N-->>B: calle y número
         B-->>S: { direccion }
         S-->>R: JSON
-        R-->>VM: "San Martín 1234, Mendoza"
+        R-->>VM: la calle real del punto
+    else nueva, APK de demo (GeocodificacionServiceNominatim)
+        R->>S: direccionDe(lat, lng)
+        S->>N: GET /reverse desde el celular
+        N-->>S: calle y número
+        S-->>R: JSON
+        R-->>VM: la calle real del punto
     end
+    Note over VM: sin internet o sin respuesta: mensaje<br/>"Escribí la dirección a mano"
     VM-->>V: notifyListeners() → muestra la dirección
     Cliente->>V: "Es acá"
     V-->>Cliente: vuelve al pago con el cuadro de texto ya completo
@@ -561,9 +661,20 @@ classDiagram
     class HistorialRepository { +guardar(Pedido) +ultimos() +limpiarViejos() }
     class HistorialService {<<interface>>}
     class HistorialDao { +guardar() +ultimos() +borrarAnterioresA() }
+    class CarritoDao { +leer() +guardar(filas) }
+    class BaseLocal {
+      +version$ = 3
+      +abierta Future~Database~
+      +crearTablas()$
+      +migrar(versionAnterior)$
+    }
     class RecordatoriosRepository { +recordarCarrito(n) +olvidarCarrito() }
     class RecordatorioService {<<interface>>}
-    class Preferencias { +leer() +guardar() +borrar() }
+    class Preferencias {
+      -SharedPreferencesAsync _almacen
+      +leer() +guardar() +borrar()
+      +olvidarTodo()
+    }
 
     Politicas --> Funciones
     FuncionesRepository --> FuncionesService
@@ -578,6 +689,8 @@ classDiagram
     HistorialRepository --> HistorialService
     HistorialService <|.. HistorialDao
     HistorialService <|.. HistorialServiceMemoria
+    HistorialDao --> BaseLocal
+    CarritoDao --> BaseLocal
     CarritoViewModel --> RecordatoriosRepository
     RecordatoriosRepository --> RecordatorioService
     RecordatorioService <|.. RecordatorioServicePlugin
@@ -592,7 +705,116 @@ Rutas.pago)` y `onGenerateRoute` (en `main.dart`) arma `PagoScreen`,
 `IngresarScreen` o `EscanerScreen` con su ViewModel. Ninguna pantalla
 necesita saber cómo se construye otra.
 
-**Base del celular (`HistorialDao`, versión 2):** tabla `pedidos` (`id` PK,
-`numero`, `fecha` TEXT ISO, `metodo_pago`, `total` REAL, `items` TEXT JSON,
-`direccion` TEXT, agregada en la versión 2 con `onUpgrade`) e índice por
-fecha.
+## 8. Lo que se guarda en el celular
+
+Cada dato va donde corresponde según **su forma**:
+
+| Dato | Dónde | Por qué ahí |
+|---|---|---|
+| El carrito | SQLite, tabla `carrito` (`CarritoDao`) | Es una **lista de objetos**: una fila por producto, se guarda en una transacción |
+| Los pedidos anteriores | SQLite, tabla `pedidos` (`HistorialDao`) | Lista que crece y se consulta por fecha |
+| El pedido en curso | `SharedPreferencesAsync` (`PedidoLocalServicePreferencias`) | Es **un solo objeto chico** que se lee al reabrir la app |
+| La hora del último aviso en segundo plano | `SharedPreferencesAsync` | Un valor suelto; lo escribe el isolate del push y lo lee la app |
+| En la web (sin SQLite) | El carrito va a preferencias (`CarritoLocalServicePreferencias`) | Lo decide `Politicas.puedeGuardarHistorial` en `dependencias.dart` |
+
+**Base del celular (`BaseLocal`, archivo `freshmarket.db`, versión 3).**
+Una sola base para todas las tablas; la ruta se arma con
+`p.join(await getDatabasesPath(), 'freshmarket.db')` y se abre una sola
+vez (getter `abierta`). Cada DAO sabe crear su tabla (`crearTabla`) y
+`BaseLocal.migrar` sube las versiones viejas sin perder datos:
+
+```mermaid
+erDiagram
+    pedidos {
+      TEXT id PK
+      INTEGER numero
+      TEXT fecha "ISO 8601, con índice"
+      TEXT metodo_pago
+      REAL total
+      TEXT items "JSON: foto del pedido"
+      TEXT direccion "versión 2"
+    }
+    carrito {
+      TEXT producto_id PK "versión 3"
+      TEXT nombre
+      REAL precio
+      TEXT categoria
+      TEXT emoji
+      TEXT descripcion
+      INTEGER disponible "0 o 1"
+      INTEGER cantidad "CHECK mayor a 0"
+      INTEGER orden "el orden en que se agregó"
+    }
+```
+
+| Versión | Qué cambió | Migración |
+|---|---|---|
+| 1 | Tabla `pedidos` | `onCreate` (una base nueva crea todas las tablas de una vez con `crearTablas`) |
+| 2 | Columna `direccion` en `pedidos` | `ALTER TABLE pedidos ADD COLUMN direccion TEXT NOT NULL DEFAULT ''` |
+| 3 | Tabla `carrito` | `CarritoDao.crearTabla` |
+
+Las consultas usan `?` y `whereArgs` (nunca se arma SQL pegando texto), y
+`ItemCarrito.toMap()` / `fromMap()` convierten entre la fila y el modelo.
+`Preferencias` recibe el `SharedPreferencesAsync` por constructor y lo
+crea recién cuando se usa: así las pruebas le pasan uno en memoria
+(`InMemorySharedPreferencesAsync`) y la base se prueba con
+`sqflite_common_ffi` en memoria (`test/persistencia_local_test.dart`,
+`test/carrito_guardado_test.dart`, `test/historial_dao_test.dart`).
+
+## 9. Cámara y lectura del producto
+
+```mermaid
+sequenceDiagram
+    actor Dueño
+    participant V as EscanerScreen
+    participant VM as EscanerViewModel
+    participant R as EtiquetadoRepository
+    participant C as CamaraServiceImagePicker
+    participant E as EtiquetadoServiceDispositivo
+    participant L as LectorDeEtiqueta
+
+    Dueño->>V: "Sacar foto" o "Elegir una foto guardada"
+    V->>VM: sacarFoto() (si estaOcupado, no hace nada)
+    VM->>R: tomarFoto()
+    R->>C: image_picker (1024 px, calidad 80)
+    alt canceló
+        C-->>VM: null → no pasa nada
+    else permiso negado o sin cámara
+        C-->>VM: ErrorDeFoto(mensaje) → mensajeError
+    else foto
+        C-->>R: bytes
+        R->>E: analizarFoto(bytes)
+        E->>E: ML Kit: texto del envase + etiquetas de la imagen
+        E->>L: armar(líneas, etiquetas)
+        L-->>R: nombre (el texto más grande) y categoría
+        R-->>VM: FichaProducto sin precio
+        VM-->>V: el dueño revisa y pone el precio
+    end
+```
+
+- **Cancelar no es un error:** devuelve `null` y la pantalla queda igual.
+- **`ErrorDeFoto` vive en el dominio** para que el ViewModel lo entienda sin
+  importar la capa de servicios; `CamaraServiceImagePicker` traduce el
+  `PlatformException` a un mensaje para la persona (`mensajePara`).
+- **Si Android cierra la app** mientras la cámara está abierta, al volver
+  `main.dart` llama a `recuperarFotoPerdida()` (`retrieveLostData`) y la foto
+  no se pierde.
+- **El precio lo pone siempre el dueño:** la app propone nombre y categoría,
+  nunca el precio.
+
+## 10. El recorrido de la bici
+
+`SeguimientoServiceSimulado` pide a `RutaService` el camino por las calles
+desde `Almacen.ubicacion` (Gutiérrez 746) hasta el destino. `RutaServiceOsrm`
+lo trae de OSRM (gratis, sin clave) y lo convierte en un `Recorrido`;
+`MapaRepartidor` mueve la bici **por ese camino** con
+`Recorrido.puntoEnFraccion`, así dobla en las esquinas. Sin internet se usa
+`RutaServiceRecta` y la bici va en línea recta.
+
+## 11. Tope de pedidos
+
+El servidor (`backend/src/app.js`, con las cuentas de `cupo.js`) acepta hasta **100 pedidos por día** y
+**100 por minuto**; si se pasa responde HTTP 429. `PagoRepository` lo
+traduce a `SinLugarParaPedidos(LimiteDePedidos.porDia | porMinuto)` y
+`PagoScreen` muestra un mensaje claro ("Por hoy ya no tomamos más pedidos."
+o "Hay muchos pedidos en este momento."), y aclara que no se cobró nada. Ver la justificación en el README.

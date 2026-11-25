@@ -139,7 +139,7 @@ avisa.
 **Qué es.** Una clase que es la **única fuente de verdad** de un tipo de
 dato. Esconde de dónde vienen los datos (red, disco, caché).
 
-**En FreshMarket** (`lib/data/repositories/`, 9 repositorios):
+**En FreshMarket** (`lib/data/repositories/`, 13 repositorios):
 - Convierte JSON en modelos (`Producto.fromJson`).
 - Guarda caché (`CatalogoRepository._cache`, `UbicacionEntregaRepository._cache`).
 - Reintenta (`_conUnReintento`) y espera (`PagoRepository.seguirEstado`).
@@ -174,14 +174,20 @@ reemplazar.
 ## 5. Strategy
 
 **Qué es.** Varias formas intercambiables de hacer lo mismo, detrás de una
-misma interfaz. Se elige una al armar la app, sin `if` repartidos.
+misma interfaz. Se elige una al armar la app, sin `if` repartidos. Algunas las elige
+`Politicas` (por ejemplo, el carrito va a SQLite en el celular y a
+preferencias en la web).
 
 | Interfaz | Estrategias |
 |---|---|
 | `PushService` | `PushServiceFirebase` / `PushServiceSimulado` |
 | `CatalogoService` | `CatalogoServiceHttp` / `CatalogoServiceLocal` |
 | `PagoService` | `PagoServiceHttp` / `PagoServiceSimulado` |
-| ... (14 interfaces en total) | |
+| `CarritoLocalService` | `CarritoDao` (SQLite) / `CarritoLocalServicePreferencias` (web) / `CarritoLocalServiceMemoria` |
+| `EtiquetadoService` | `EtiquetadoServiceHttp` (Gemini en el servidor) / `EtiquetadoServiceDispositivo` (ML Kit) / `EtiquetadoServiceSimulado` |
+| `GeocodificacionService` | `GeocodificacionServiceHttp` / `GeocodificacionServiceNominatim` / `GeocodificacionServiceSimulado` |
+| `RutaService` | `RutaServiceOsrm` (por las calles) / `RutaServiceRecta` (sin internet) |
+| ... (20 interfaces en total) | |
 | Backend `push.js` | Firebase o consola |
 | Backend `correo.js` | SMTP o consola |
 | Backend `geo.js` | Google, Nominatim o simulado |
@@ -214,6 +220,12 @@ tenga que saber cómo.
   un `Aviso` del dominio. El resto de la app no sabe que existe Firebase.
 - Backend `geo.js`: Google y Nominatim responden distinto; los dos se
   convierten en `{ direccion }`.
+- `RutaServiceOsrm.leerRespuesta`: convierte el GeoJSON de OSRM en un
+  `Recorrido` del dominio.
+- `CamaraServiceImagePicker`: convierte el `PlatformException` del paquete en
+  un `ErrorDeFoto` del dominio, con un mensaje para la persona.
+- `CarritoRepository` / `ItemCarrito.toMap()` y `fromMap()`: de filas de
+  SQLite a modelos y al revés.
 
 ---
 
@@ -223,13 +235,15 @@ tenga que saber cómo.
 
 - Backend: una sola conexión a la base (`bd.js`) y un solo emisor de
   eventos (`eventos.js`).
-- App: `FirebaseMessaging.instance` y `SharedPreferences.getInstance()`
-  (vienen así de los paquetes).
+- App: `FirebaseMessaging.instance` (viene así del paquete).
 
 En nuestro código de la app **no** hay ninguna clase con `static instancia`.
 Un Singleton clásico es estado global: no se puede reemplazar en una prueba.
-`Dependencias` crea **una** instancia de cada repositorio y la pasa por
-constructor: la misma garantía, pero se puede probar.
+`Dependencias` crea **una** instancia de cada repositorio, **una sola**
+`BaseLocal` (el archivo SQLite se abre una vez), **una sola** `Preferencias`
+y una sola `Politicas`, y las pasa por constructor: la misma garantía, pero
+se puede probar (las pruebas pasan una base en memoria y preferencias en
+memoria).
 
 ---
 

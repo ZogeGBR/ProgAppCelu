@@ -5,14 +5,17 @@ para Celulares* (ITU), a partir de la entrevista a Don Ceferino, dueño de
 FreshMarket (almacén de barrio).
 
 **Versión 3:** arquitectura en capas (MVVM), mapa con el repartidor en
-bicicleta en tiempo real, carga de productos con una foto (IA), pagos con
+bicicleta en tiempo real (sale de Gutiérrez 746 y va por las calles), carga
+de productos con una foto (la app lee el envase; el precio lo pone el
+dueño), pagos con
 Mercado Pago (débito, crédito y dinero en cuenta) o en efectivo al recibir,
 dirección de entrega, modo repartidor con GPS, administración del almacén y
 una navegación pensada para personas que no usan mucho el celular.
 
 Además: cuentas con email y contraseña (con el **ojo** para ver lo que se
 escribe y **recuperación por código**), **dirección automática** al tocar el
-mapa y carrito guardado en el celular.
+mapa (la calle real del punto) y carrito guardado en el celular
+(**SQLite**).
 
 **07-11:** **notificaciones push** con Firebase ("tu pedido está en camino",
 "llegó", "nuevo pedido"), **Observer también entre ViewModels y
@@ -22,8 +25,9 @@ APK para probar en un celular real.
 - Qué se mejoró y qué falta: [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
 - Teoría de la materia y patrones (dónde se usa cada uno y por qué no los
   otros): [`INFORME_TEORIA_Y_PATRONES.md`](INFORME_TEORIA_Y_PATRONES.md).
-- Diagramas de capas, de clases y de la base de datos:
-  [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+- Diagramas de capas, de clases, de las dos bases (servidor y celular), de la
+  cámara y del recorrido de la bici: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
+  (también en PNG en `docs/diagramas/`).
 - **Qué se cambió el 07-11, por qué y cómo** (después de mostrarle la app a
   la profesora): [`INFORME_CAMBIOS_07-11.md`](INFORME_CAMBIOS_07-11.md).
 - Guía para el oral (cada patrón explicado con el código):
@@ -38,11 +42,11 @@ APK para probar en un celular real.
   instalar y capturas para F2): [`docs/GUIA_APK_DESDE_CERO.md`](docs/GUIA_APK_DESDE_CERO.md).
 - Instalar la app en un celular real: [`docs/CELULAR_REAL.md`](docs/CELULAR_REAL.md).
 
-## Presentación final (19/11)
+## Presentación final y EGI
 
 - **Rúbrica, criterio por criterio, con qué mostrar y dónde está:**
   [`docs/RUBRICA.md`](docs/RUBRICA.md).
-- **Guion de la demo y 15 preguntas probables:**
+- **Guion de la demo y preguntas probables:**
   [`docs/DEMO_Y_DEFENSA.md`](docs/DEMO_Y_DEFENSA.md).
 - **Firma, App Bundle y prueba interna de Play Store:**
   [`docs/PUBLICACION.md`](docs/PUBLICACION.md).
@@ -53,6 +57,14 @@ adaptativo (grilla en pantallas anchas), gestos con "Deshacer", aviso de
 "Sin internet", recordatorio programado del carrito, push en segundo plano,
 historial de pedidos en SQLite con "Volver a pedir", ícono, splash y firma
 de la versión release.
+
+Después de la presentación (teoría de cámara y persistencia): el **carrito
+pasó a una tabla SQLite** (`CarritoDao`) en la misma base que el historial
+(`BaseLocal`, versión 3, con migraciones); `Preferencias` usa
+`SharedPreferencesAsync` inyectado; la cámara traduce sus errores a
+`ErrorDeFoto` y recupera la foto si Android cerró la app; datos reales en la
+demo (Nominatim, OSRM y ML Kit); y el tope de **100 pedidos por día y por
+minuto** en el servidor.
 
 ## Cómo correrlo
 
@@ -147,24 +159,36 @@ lib/
 ├── main.dart                    ← crea los ViewModels una vez y arma la app
 ├── config/
 │   └── dependencias.dart        ← ÚNICO lugar donde se elige real o simulado
-├── domain/models/               ← datos puros: Producto, Pedido, Posicion...
+├── domain/
+│   ├── models/   (20)           ← datos puros: Producto, Pedido, ItemCarrito, Recorrido,
+│   │                               Almacen (Gutiérrez 746), ErrorDeFoto, LimiteDePedidos...
+│   └── politicas/               ← Politicas: qué puede hacer este dispositivo
 ├── data/
-│   ├── services/                ← hablan con afuera, sin estado
+│   ├── services/ (24)           ← hablan con afuera, sin estado
 │   │   ├── api_client.dart          (HTTP con tiempo límite)
 │   │   ├── catalogo_service.dart    (backend / local)
 │   │   ├── pago_service.dart        (Mercado Pago vía backend / simulado)
-│   │   ├── seguimiento_service.dart (backend cada 3 s / simulado)
+│   │   ├── seguimiento_service.dart (backend cada 3 s / simulado con ruta real)
+│   │   ├── ruta_service.dart        (camino por las calles: OSRM / línea recta)
 │   │   ├── etiquetado_service.dart  (IA vía backend / simulada)
+│   │   ├── etiquetado_dispositivo_service.dart + lector_de_etiqueta.dart
+│   │   │                             (ML Kit en el celular: lee el envase)
 │   │   ├── sesion_service.dart      (ingreso y recuperación de contraseña)
-│   │   ├── geocodificacion_service.dart (punto del mapa → calle y número)
-│   │   ├── carrito_local_service.dart   (carrito guardado en el celular)
+│   │   ├── geocodificacion_service.dart (punto del mapa → calle: backend / Nominatim)
+│   │   ├── base_local.dart          (UNA base SQLite, versión 3, migraciones)
+│   │   ├── historial_dao.dart       (tabla pedidos)
+│   │   ├── carrito_local_service.dart   (CarritoDao: tabla carrito; en web, preferencias)
+│   │   ├── preferencias.dart        (SharedPreferencesAsync inyectado)
+│   │   ├── pedido_local_service.dart    (pedido en curso, en preferencias)
 │   │   ├── reparto_service.dart     (pedidos y posición del repartidor)
 │   │   ├── ubicacion_service.dart   (GPS con geolocator)
-│   │   ├── camara_service.dart      (image_picker)
+│   │   ├── camara_service.dart      (image_picker; errores → ErrorDeFoto)
 │   │   ├── push_service.dart        (Firebase Cloud Messaging / simulado)
 │   │   ├── notificacion_local_service.dart (mostrar el aviso en la barra)
+│   │   ├── recordatorio_service.dart (aviso programado del carrito)
+│   │   ├── conectividad_service.dart / funciones_service.dart
 │   │   └── avisos_service.dart      (qué avisos pide este celular al backend)
-│   └── repositories/            ← JSON → modelo, caché, reintentos, esperas;
+│   └── repositories/ (13)       ← JSON o filas → modelo, caché, reintentos, esperas;
 │                                   publican sus cambios en un Stream (Observer)
 └── ui/
     ├── core/                    ← tema accesible, formato de precios, VistaMensaje, CampoClave
@@ -180,8 +204,9 @@ lib/
     └── avisos/                  ← AvisosViewModel (notificaciones)
 backend/                         ← Node + Express + SQLite (pagos, IA, reparto, cuentas, mapa, push)
 ├── sql/                         ← schema.sql y seed.sql
-docs/                            ← ARQUITECTURA, NOTIFICACIONES, GUIA_PATRONES, CELULAR_REAL y diagramas
-test/                            ← pruebas con fakes (sin internet)
+docs/                            ← ARQUITECTURA, TEORIA_CAMARA_Y_PERSISTENCIA, AUDITORIA_FINAL,
+                                   GUIA_APK_DESDE_CERO, NOTIFICACIONES, GUIA_PATRONES y diagramas
+test/          (24 archivos)     ← 200 pruebas con fakes (sin internet; SQLite en memoria)
 ```
 
 ```
@@ -192,9 +217,10 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
                                      Repositorio  (caché, reintento, conversión;
                                             │       publica sus cambios)
                                             ▼
-                                       Servicio    (red, cámara; sin estado)
+                                       Servicio    (red, cámara, SQLite; sin estado)
                                             ▼
-                         Backend propio ──▶ Mercado Pago / Gemini / repartidor
+          Backend propio ──▶ Mercado Pago / Gemini / repartidor
+          (demo: Nominatim, OSRM y ML Kit, sin claves; SQLite y preferencias en el celular)
 ```
 
 ## Convenciones
@@ -230,8 +256,8 @@ Vista (Screen)  ──llama comandos──▶  ViewModel (ChangeNotifier)
 |---|---|
 | Ver el catálogo con precio del día | `ui/catalogo` + `CatalogoRepository` (backend o local); el dueño lo cambia en `ui/almacen` |
 | Pagar "con tarjeta o Mercado Pago" | `ui/pago` + `PagoRepository` + `backend/src/pagos.js` (Checkout Pro) |
-| Ver el reparto "como el GPS de un taxi" | `ui/seguimiento/widgets/mapa_repartidor.dart` + `backend/src/seguimiento.js` |
+| Ver el reparto "como el GPS de un taxi" | `ui/seguimiento/widgets/mapa_repartidor.dart` (la bici sigue un `Recorrido` por las calles desde `Almacen`, con `RutaServiceOsrm`) + `backend/src/seguimiento.js` |
 | "Saber en todo momento en qué estado está el pedido" (también con la app cerrada) | Notificaciones push: `NotificacionesRepository` + `backend/src/avisos.js` (`docs/NOTIFICACIONES.md`) |
-| Cargar productos sin saber de tecnología | `ui/escaner` + `backend/src/ia.js` (foto → etiqueta) |
+| Cargar productos sin saber de tecnología | `ui/escaner`: la foto se lee en el celular con ML Kit (`etiquetado_dispositivo_service.dart`) o en el servidor con Gemini (`backend/src/ia.js`); la app propone nombre y categoría y **el precio lo pone el dueño** |
 | Que sea fácil para clientes mayores | `ui/inicio` (barra de 3 botones) + `ui/core/tema.dart` |
 | 5.000 pedidos simultáneos en Nochebuena, sin pagar servidores | **Incompatibles.** Un almacén de barrio recibe hasta unos **100 pedidos por día** (el límite real son los repartidores en bici). El servidor se dimensiona para eso: **100 por día y 100 por minuto** (`backend/src/cupo.js`), probado sin errores, y alcanza un servidor chico y barato. Pasado el tope, la app avisa con un mensaje claro y no cobra nada. Ver `INFORME_MEJORAS.md`, "Prueba de carga" |

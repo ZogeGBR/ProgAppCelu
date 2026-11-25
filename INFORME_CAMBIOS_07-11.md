@@ -4,6 +4,15 @@ Programación de Aplicaciones para Celulares · ITU
 
 García Badiola, Zoe — Lopez, Matias — Morichetti Ramal, Ignacio
 
+> **Informe histórico.** Cuenta el estado del proyecto en esa fecha. Desde
+> entonces cambió: el carrito se guarda en **SQLite** (tabla `carrito`,
+> `BaseLocal` versión 3), la demo usa datos reales (Nominatim, OSRM y ML
+> Kit en el celular), la cámara maneja sus errores con `ErrorDeFoto`, el
+> tope es de **100 pedidos por día y por minuto** y hay **200** pruebas de la
+> app y 52 del backend. El estado actual está en
+> [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) y
+> [`docs/AUDITORIA_FINAL.md`](docs/AUDITORIA_FINAL.md).
+
 Cuando le mostramos la app, la profesora marcó qué faltaba. Este informe
 cuenta **qué se hizo con cada punto, por qué se hizo así y cómo**, más lo
 que se corrigió al revisar el código y cómo se comprobó que todo anda.

@@ -1,4 +1,14 @@
-# Auditoría final de FreshMarket (15/11)
+# Auditoría final de FreshMarket (15/11, actualizada el 25/11)
+
+> **Actualización del 25/11.** Después de la presentación se compararon el
+> código y los apuntes de la materia (cámara, persistencia y datos en la
+> nube) y se corrigió lo que faltaba: el carrito pasó a **SQLite** (tabla
+> `carrito`, `BaseLocal` versión 3 con migraciones), `Preferencias` usa
+> `SharedPreferencesAsync` inyectado, la cámara traduce sus errores a
+> `ErrorDeFoto` y recupera la foto perdida, y la demo usa datos reales
+> (Nominatim, OSRM y ML Kit). Las pruebas pasaron a **200** (verificadas en
+> la PC: `flutter analyze` sin avisos y `All tests passed!`). Detalle en
+> [`TEORIA_CAMARA_Y_PERSISTENCIA.md`](TEORIA_CAMARA_Y_PERSISTENCIA.md).
 
 Revisión del código de la rama `main` antes de la presentación del 19/11,
 contra tres cosas: el concepto de **MVC/MVVM**, la **rúbrica** de la
@@ -16,7 +26,7 @@ una prueba o un comando.
 | Rúbrica | 17 de 18 con evidencia completa; **F2 espera las capturas del celular real** |
 | Pedidos de Don Ceferino | 6 de 6 resueltos; el de 5.000 pedidos, justificado y dimensionado para 100 por día y 100 por minuto |
 | Correcciones del 07/11 | 6 de 6 en el código |
-| Pruebas | App: 157 en verde (15/11) + 5 nuevas = 162; backend: 52/52 (corrido hoy) |
+| Pruebas | App: **200/200** en 24 archivos (25/11); backend: **52/52** |
 | Riesgos de celular real encontrados | 2, **corregidos** (ícono de notificaciones e iOS) |
 
 ## 1. MVC / MVVM
@@ -70,20 +80,20 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 | **B1** Widgets | Cumple | `VistaMensaje`, `CampoClave`, `SelectorCantidad`, `ProductoCard`, `AvisoSinInternet`, `HistorialDePedidos`; `tema.dart` |
 | **B2** Estado y ciclo de vida | Cumple | 8 `StatefulWidget` con `initState`/`dispose`; `didUpdateWidget` en `mapa_repartidor.dart` |
 | **B3** Navegación y gestos | Cumple | `rutas.dart` + `onGenerateRoute`; mantener apretado, deslizar con "Deshacer", tirar para recargar; pruebas en `presentacion_final_test.dart` |
-| **B4** Multiplataforma | Cumple | Íconos y splash **generados y subidos** (`e29a768`), permisos con motivo, grilla desde 840 de ancho, versión `1.1.0+2`; sección iOS en `PUBLICACION.md` |
-| **C1** Capas | Cumple | Sección 1 de este informe; `docs/diagramas/capas.png` y `clases.png` |
+| **B4** Multiplataforma | Cumple | Íconos y splash **generados y subidos** (`e29a768`), permisos con motivo, grilla desde 840 de ancho, versión `1.1.0+2`; reglas de R8 (`proguard-rules.pro`) para el release con ML Kit; sección iOS en `PUBLICACION.md` (iOS necesita una Mac; ML Kit pide iOS 15.0) |
+| **C1** Capas | Cumple | Sección 1 de este informe; `docs/diagramas/capas.png`, `clases.png`, `base_celular.png` y `secuencia_camara.png` (regenerados el 25/11) |
 | **C2** Código limpio | Cumple | `flutter analyze` sin avisos con `unawaited_futures` y `use_build_context_synchronously` |
 | **C3** Refactoring | Cumple | `caracterizacion_test.dart`; refactorings nombrados en `INFORME_MEJORAS.md` |
-| **C4** Pruebas | Cumple | 21 archivos de prueba (162 pruebas) + 52 del backend; capturas en `docs/evidencias/` |
+| **C4** Pruebas | Cumple | 24 archivos de prueba (**200** pruebas, SQLite y preferencias en memoria) + 52 del backend; capturas en `docs/evidencias/` |
 | **D1** Políticas | Cumple | `politicas.dart` con los tres chequeos; `politicas_test.dart`, `funciones.test.js` |
-| **D2** Future | Cumple | `timeout` en `funciones_repository.dart`, `Future.wait` en `main.dart`, `context.mounted` en `ingresar_screen.dart` |
+| **D2** Future | Cumple | `timeout` en `funciones_repository.dart`, `ruta_service.dart` y `geocodificacion_service.dart`; `Future.wait` en `main.dart` (incluye recuperar la foto perdida); `context.mounted` en `ingresar_screen.dart` |
 | **D3** Streams e Isolates | Cumple | `Stream.periodic` + `asyncMap` (`seguimiento_service.dart`), `distinct()` (`conectividad_repository.dart`), `Isolate.run` (`etiquetado_service.dart`) |
 | **E1** Notificaciones | Cumple | 4 casos de FCM en `push_service.dart`; 21 pruebas en `notificaciones_test.dart` |
 | **E2** Segundo plano | Cumple | `zonedSchedule` + receptores de reinicio en el manifest; `segundo_plano_y_eventos_test.dart` |
 | **E3** Eventos del sistema | Cumple | `AppLifecycleListener` en `main.dart`; `connectivity_plus` con aviso; prueba "sin internet aparece el aviso" |
-| **F1** Persistencia y APIs | Cumple | `historial_dao.dart` (SQLite, `?`, `onUpgrade`); `preferencias.dart`; `backend/sql/schema.sql` (7 tablas); Mercado Pago, Gemini, geocodificación |
+| **F1** Persistencia, APIs y cámara | Cumple | `base_local.dart` (una base, versión 3, migraciones) con `historial_dao.dart` y `CarritoDao` (SQLite, `?`, transacción); `preferencias.dart` (`SharedPreferencesAsync` inyectado); `camara_service.dart` (`ErrorDeFoto`, `retrieveLostData`); `backend/sql/schema.sql` (7 tablas); Mercado Pago, Gemini, Nominatim, OSRM y ML Kit |
 | **F2** Celular real y publicación | **Falta la evidencia** | APK release compilado (55,1 MB) y firma configurada. Faltan las capturas en el celular: `docs/GUIA_APK_DESDE_CERO.md`, paso 11 |
-| **G1** Demo y defensa | Cumple | `docs/DEMO_Y_DEFENSA.md` (guion, plan B, 15 preguntas) |
+| **G1** Demo y defensa | Cumple | `docs/DEMO_Y_DEFENSA.md` (guion, plan B, 16 preguntas) |
 
 ## 3. Lo pedido al inicio
 
@@ -91,9 +101,9 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 |---|---|---|
 | Catálogo con el precio del día, que el dueño cambia | `ui/catalogo`, `ui/almacen`, `CatalogoRepository` | `almacen_view_model_test.dart` ("cambiar el precio llega también a la pantalla de comprar") |
 | Pagar con tarjeta o Mercado Pago (billetera virtual) | `ui/pago`, `backend/src/pagos.js` (Checkout Pro) | `pago_view_model_test.dart` (10) |
-| Ver al repartidor en bicicleta "como el GPS de un taxi" | `mapa_repartidor.dart`, `backend/src/seguimiento.js` | "flujo completo: agregar, pagar y ver el seguimiento" |
+| Ver al repartidor en bicicleta "como el GPS de un taxi" | `mapa_repartidor.dart` (la bici sale de `Almacen`, Gutiérrez 746, y sigue un `Recorrido` por las calles de `RutaServiceOsrm`), `backend/src/seguimiento.js` | "flujo completo: agregar, pagar y ver el seguimiento"; `datos_reales_test.dart` |
 | Saber el estado del pedido, también con la app cerrada | Push (FCM) + notificaciones locales | `notificaciones_test.dart` (21) |
-| Cargar productos con una foto e IA | `ui/escaner`, `backend/src/ia.js` (Gemini) | `escaner_view_model_test.dart` (5) |
+| Cargar productos con una foto e IA | `ui/escaner`; ML Kit en el celular (`etiquetado_dispositivo_service.dart` + `lector_de_etiqueta.dart`) o Gemini en el servidor (`backend/src/ia.js`); el precio lo pone el dueño | `escaner_view_model_test.dart`, `datos_reales_test.dart` |
 | Fácil para clientes mayores | Barra de 3 botones, letra grande, botones de 56 dp | `widget_test.dart` |
 | 5.000 pedidos simultáneos sin pagar servidores | Incompatible; dimensionado para **100 por día y 100 por minuto** con tope en el servidor (`cupo.js`) y aviso claro en la app | `cupo.test.js` (5), "tope de 100 pedidos" (4), `carga.mjs` |
 
@@ -103,10 +113,10 @@ lectura: la vista no puede cambiar el estado" (`almacen_view_model_test.dart`).
 |---|---|---|
 | "Ojo" para ver la contraseña | `campo_clave.dart` (`obscureText: !_visible`) | "el ojo muestra y oculta la contraseña" |
 | Recuperar la contraseña | `recuperar_clave_*`, `backend/src/recuperacion.js` | "recuperar la contraseña y entrar con la nueva" |
-| Tocar el mapa y que traiga esa dirección | `elegir_ubicacion_screen.dart` (`onTap`) | `elegir_ubicacion_view_model_test.dart` (8) |
+| Tocar el mapa y que traiga esa dirección | `elegir_ubicacion_screen.dart` (`onTap`) → la calle real del punto (Nominatim) | `elegir_ubicacion_view_model_test.dart`, `datos_reales_test.dart` |
 | Diagrama de clases | `docs/diagramas/clases.png`, `docs/ARQUITECTURA.md` | — |
 | MVC sin romper el encapsulamiento | Sección 1 de este informe | `observer_test.dart` + la prueba nueva |
-| SQL | `backend/sql/schema.sql` y `seed.sql`; SQLite en el celular | `historial_dao_test.dart` |
+| SQL | `backend/sql/schema.sql` y `seed.sql`; SQLite en el celular (tablas `pedidos` y `carrito`) | `historial_dao_test.dart`, `persistencia_local_test.dart`, `carrito_guardado_test.dart` |
 
 ## 4. Riesgos de celular real (corregidos)
 
@@ -124,20 +134,17 @@ release o en un iPhone.
    `AppDelegate.swift`. Sin él, iOS no muestra los avisos con la app abierta.
    Se copió la configuración del ejemplo oficial del plugin.
 
-## 5. Lo que queda (antes del 19/11)
+## 5. Lo que queda
 
-1. **Volver a correr las pruebas en la PC**, después de `git pull`:
-   `flutter analyze` y `flutter test` (deberían ser **200**). Es la única
-   forma de confirmar los cambios de esta auditoría, porque acá no hay
-   Flutter.
-2. **Volver a generar el APK** (`flutter build apk --release`), para que
-   incluya el ícono nuevo de las notificaciones.
-3. **F2: capturas en un celular Android real**, siguiendo el paso 11 de
+Hecho desde el 15/11: las pruebas corridas en la PC (**200** en verde y
+`flutter analyze` limpio) y el APK release recompilado con ML Kit.
+
+1. **F2: capturas en un celular Android real**, siguiendo el paso 11 de
    `docs/GUIA_APK_DESDE_CERO.md`. Es lo único que falta para tener los 18
    criterios con evidencia.
-4. **Ensayar la demo** con `docs/DEMO_Y_DEFENSA.md`. El recordatorio del
-   carrito tarda 2 horas a propósito: en vivo, mostrar la prueba
-   `segundo_plano_y_eventos_test.dart` en lugar de esperarlo.
+2. **Antes de la EGI:** `git pull`, volver a instalar el APK de `main` en el
+   celular y tener el proyecto abierto en VS Code.
+3. **Producción** (fuera del alcance del trabajo): servidor con https,
+   credenciales reales de Mercado Pago y un correo real (`SMTP_URL`).
 
-No se pudo comprobar acá: la compilación en una Mac (iOS) y el
-comportamiento en un celular real. Para lo segundo, ver el punto 3.
+No se pudo comprobar: la compilación en una Mac (iOS).

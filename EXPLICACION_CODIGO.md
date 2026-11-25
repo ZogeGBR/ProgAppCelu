@@ -2,30 +2,29 @@
 
 Guía archivo por archivo del proyecto. Explica qué hace cada archivo, cómo se conectan entre sí y por qué está hecho así. Está pensada para entender el código de punta a punta y poder defenderlo en una presentación.
 
-> **Aviso — Versión 3.** Esta guía explica archivo por archivo la
-> **versión 2** (carpetas `models/`, `providers/`, `screens/`, `widgets/`,
-> `utils/`). En la V3 el proyecto se reorganizó en capas. Los conceptos
-> siguen valiendo; lo que cambió de lugar es esto:
+> **Aviso: esta guía explica la versión 2.** Las secciones 1 a 15 recorren
+> archivo por archivo la **versión 2** (carpetas `models/`, `providers/`,
+> `screens/`, `widgets/`, `utils/`). Los conceptos de Flutter siguen valiendo,
+> pero la app final está organizada en capas (MVVM). **Para la versión que se
+> presenta, leer primero [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)**
+> (cada clase en su capa, con diagramas) y
+> [`docs/TEORIA_CAMARA_Y_PERSISTENCIA.md`](docs/TEORIA_CAMARA_Y_PERSISTENCIA.md).
 >
-> | V2 | V3 |
-> |> **Versión 4.** Se sumaron: `ui/core/widgets/campo_clave.dart` (el ojo),
-> `ui/sesion/` con la recuperación de contraseña, `ui/pago/` con
-> `ElegirUbicacionViewModel` (tocar el mapa → dirección),
-> `data/services/geocodificacion_service.dart`,
-> `data/services/carrito_local_service.dart`, sus repositorios y
-> `backend/sql/`. Cada clase en su capa: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
-> Patrones usados y no usados: [`INFORME_TEORIA_Y_PATRONES.md`](INFORME_TEORIA_Y_PATRONES.md).
-
----|---|
+> Dónde quedó cada cosa de la V2:
+>
+> | V2 | Versión final |
+> |---|---|
 > | `models/*.dart` | `domain/models/*.dart` (sin `IconData`: los íconos y textos pasaron a `ui/.../*_ui.dart`) |
 > | `providers/carrito_provider.dart` | `ui/carrito/view_models/carrito_view_model.dart` (`confirmarPedido` se separó en `armarPedido` + `vaciarCarrito`) |
 > | `screens/home_screen.dart` | `ui/catalogo/widgets/catalogo_screen.dart` + `CatalogoViewModel` |
 > | `screens/carrito_screen.dart` | `ui/carrito/widgets/carrito_screen.dart` |
-> | `screens/metodo_pago_screen.dart` | `ui/pago/widgets/pago_screen.dart` + `PagoViewModel` (Mercado Pago real) |
-> | `screens/seguimiento_screen.dart` | `ui/seguimiento/` (+ mapa en tiempo real) |
+> | `screens/metodo_pago_screen.dart` | `ui/pago/widgets/pago_screen.dart` + `PagoViewModel` (Mercado Pago) y `ElegirUbicacionViewModel` (tocar el mapa → la calle real) |
+> | `screens/seguimiento_screen.dart` | `ui/seguimiento/` (la bici sale de Gutiérrez 746 y va por las calles: `Recorrido` + `RutaService`) |
 > | `widgets/*.dart` | `ui/catalogo/widgets/` |
 > | `utils/formato.dart` | `ui/core/formato.dart` |
-> | — | `data/services/`, `data/repositories/`, `config/dependencias.dart`, `ui/escaner/`, `backend/` (nuevos) |
+> | — | `data/services/`, `data/repositories/`, `config/dependencias.dart`, `domain/politicas/`, `backend/` |
+> | — | `ui/escaner/` (foto → ML Kit lee el envase; el precio lo pone el dueño), `ui/sesion/` (el ojo y la recuperación de contraseña), `ui/almacen/`, `ui/reparto/`, `ui/avisos/` |
+> | Carrito en memoria | Carrito en **SQLite** (`CarritoDao`, tabla `carrito` de `BaseLocal` versión 3) |
 >
 > Qué se mejoró y por qué: [`INFORME_MEJORAS.md`](INFORME_MEJORAS.md).
 
@@ -959,14 +958,32 @@ Lo mismo pero para iPhone. Solo se puede compilar desde una Mac, así que en est
 
 Cosas que no son errores pero que vale la pena conocer, por si te preguntan o querés mejorar algo.
 
-1. **`List.unmodifiable` no protege los ítems por dentro.** La lista no se puede modificar, pero `carrito.items[0].cantidad = 99` **sí funciona**, porque `cantidad` es mutable, y encima no llamaría a `notifyListeners()`. Para blindarlo, `ItemCarrito` debería ser inmutable (con `final cantidad` y un método `copyWith`).
-2. **`carrito.items` crea una copia cada vez que se llama.** En `CarritoScreen`, el `itemBuilder` hace `carrito.items[index]`, así que copia la lista por cada renglón. Con 8 productos no importa; con miles convendría guardar `final items = carrito.items;` una vez antes del `ListView`.
-3. **`formatearPrecio` no maneja bien los negativos.** Cuenta el `-` como si fuera un dígito, así que `-150` da `$-.150`. No pasa en la app porque nunca hay precios negativos.
-4. **El número de pedido se reinicia** al cerrar la app (vuelve a 1001), porque vive en memoria. Lo mismo pasa con el carrito. Persistirlos requeriría `shared_preferences` o una base de datos.
-5. **El catálogo es fijo.** Los precios del día de Don Ceferino deberían venir de una API o base de datos para que él los pueda cambiar.
-6. **Prop drilling:** pasar el carrito por constructor está bien con 4 pantallas. Con muchas más, se suele usar `InheritedWidget` o el paquete `provider` para no pasarlo a mano por todos lados.
-7. **El pago y el seguimiento son simulados**: `Future.delayed` y `Timer`. Los "puntos de extensión" están comentados en el código.
-8. **5.000 pedidos simultáneos sin pagar servidor**: las dos cosas son incompatibles. El sistema se dimensionó para lo que recibe un almacén de barrio: **100 pedidos por día y 100 por minuto**. El tope lo hace cumplir el backend (`backend/src/cupo.js`); la app traduce la respuesta 429 a `SinLugarParaPedidos` (dominio) en `PagoRepository`, y `PagoScreen` muestra "Por hoy ya no tomamos más pedidos" o "Probá en un minuto".
+Esta lista se escribió para la V2. Al lado de cada punto está cómo quedó
+en la versión final.
+
+1. **`List.unmodifiable` no protege los ítems por dentro.** En la V2
+   `carrito.items[0].cantidad = 99` funcionaba sin avisar. **Resuelto:**
+   `ItemCarrito` es inmutable (`final cantidad` y `copiarCon`).
+2. **`carrito.items` crea una copia cada vez que se llama.** Con pocos
+   productos no importa; con miles convendría guardar la lista una vez antes
+   del `ListView`.
+3. **`formatearPrecio` no maneja bien los negativos.** No pasa en la app
+   porque nunca hay precios negativos.
+4. **El número de pedido y el carrito se perdían al cerrar la app.**
+   **Resuelto:** el número lo da el servidor; el carrito se guarda en
+   **SQLite** (tabla `carrito`, `CarritoDao`) y el pedido en curso en
+   `SharedPreferencesAsync` (`Preferencias`). Ver `docs/ARQUITECTURA.md`,
+   sección 8.
+5. **El catálogo era fijo.** **Resuelto:** viene del backend y el dueño
+   cambia precios desde "Mi almacén".
+6. **Prop drilling.** **Resuelto:** cada pantalla recibe su ViewModel, los
+   ViewModels se crean una vez en `main.dart` y se comunican observando a
+   los repositorios (Observer).
+7. **El pago y el seguimiento eran simulados con `Future.delayed` y
+   `Timer`.** **Resuelto:** Mercado Pago vía backend. En el APK de demo el
+   pago se aprueba solo, pero la dirección (Nominatim), el camino de la bici
+   (OSRM) y la lectura de la foto (ML Kit) son reales.
+8. **5.000 pedidos simultáneos sin pagar servidor**: las dos cosas son incompatibles. El sistema se dimensionó para lo que recibe un almacén de barrio: **100 pedidos por día y 100 por minuto**. El tope lo hace cumplir el backend (`backend/src/cupo.js`); la app traduce la respuesta 429 a `SinLugarParaPedidos` (dominio) en `PagoRepository`, y `PagoScreen` muestra "Por hoy ya no tomamos más pedidos" o "Hay muchos pedidos en este momento".
 
 ---
 
