@@ -30,6 +30,8 @@ APK para probar en un celular real.
   [`docs/GUIA_PATRONES.md`](docs/GUIA_PATRONES.md).
 - Notificaciones push y cómo configurar Firebase:
   [`docs/NOTIFICACIONES.md`](docs/NOTIFICACIONES.md).
+- **Teoría de cámara, persistencia y datos en la nube** (comparación con los apuntes):
+  [`docs/TEORIA_CAMARA_Y_PERSISTENCIA.md`](docs/TEORIA_CAMARA_Y_PERSISTENCIA.md).
 - **Auditoría final** (MVC, los 18 criterios y lo pedido al inicio, con evidencia):
   [`docs/AUDITORIA_FINAL.md`](docs/AUDITORIA_FINAL.md).
 - **Desde cero hasta el APK en el celular** (instalar todo en Windows, compilar,
@@ -124,7 +126,7 @@ sola al arrancar, o a mano con `cd backend && npm run bd:crear`.
 ```bash
 dart format lib test
 flutter analyze
-flutter test           # app: 180 pruebas (ViewModels con fakes, Observer, avisos, pantallas, SQLite)
+flutter test           # app: 200 pruebas (ViewModels con fakes, Observer, avisos, pantallas, SQLite)
 cd backend && npm test # backend: 52 pruebas
 node scripts/carga.mjs 100   # (desde backend/) prueba de carga: 100 clientes a la vez
 ```

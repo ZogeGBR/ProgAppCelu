@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/catalogo_repository.dart';
 import '../../../data/repositories/etiquetado_repository.dart';
+import '../../../domain/models/error_de_foto.dart';
 import '../../../domain/models/ficha_producto.dart';
 
 /// Pasos de "Cargar producto con foto".
@@ -28,6 +29,8 @@ class EscanerViewModel extends ChangeNotifier {
   Uint8List? _foto;
   FichaProducto? _ficha;
   String? _ultimoGuardado;
+  String? _mensajeError;
+  bool _eligiendoFoto = false;
   bool _descartado = false;
 
   PasoEscaner get paso => _paso;
@@ -36,25 +39,67 @@ class EscanerViewModel extends ChangeNotifier {
   String? get ultimoGuardado => _ultimoGuardado;
   bool get puedeGuardar => _ficha?.estaCompleta ?? false;
 
+  /// Qué falló, en palabras para la persona (por ejemplo, "No tenemos
+  /// permiso para usar la cámara"). Null si no hay un motivo conocido.
+  String? get mensajeError => _mensajeError;
+
+  /// Mientras la cámara está abierta, o se analiza o guarda la foto, no se
+  /// puede abrir otra vez (dos toques rápidos no abren dos cámaras).
+  bool get estaOcupado =>
+      _eligiendoFoto ||
+      _paso == PasoEscaner.analizando ||
+      _paso == PasoEscaner.guardando;
+
+  /// Tres resultados posibles: una foto (se analiza), null (canceló: no
+  /// pasa nada) o [ErrorDeFoto] (se muestra el motivo).
   Future<void> sacarFoto({bool deGaleria = false}) async {
-    Uint8List? foto;
+    if (estaOcupado) return;
+    _eligiendoFoto = true;
+    final Uint8List? foto;
     try {
       foto = await _etiquetado.tomarFoto(deGaleria: deGaleria);
-    } on Exception {
-      _cambiarPaso(PasoEscaner.error);
+    } on ErrorDeFoto catch (error) {
+      _mostrarError(error.mensaje);
       return;
+    } on Exception {
+      _mostrarError(null);
+      return;
+    } finally {
+      _eligiendoFoto = false;
     }
     if (foto == null) return; // Canceló la cámara: no pasa nada.
+    await _analizar(foto);
+  }
 
+  /// Se llama al abrir la app: si Android la cerró con la cámara abierta,
+  /// la foto no se pierde y el dueño sigue donde estaba.
+  Future<void> recuperarFotoPerdida() async {
+    if (estaOcupado) return;
+    final Uint8List? foto;
+    try {
+      foto = await _etiquetado.recuperarFotoPerdida();
+    } on Exception {
+      return; // No había nada que recuperar: la app sigue normal.
+    }
+    if (foto != null) await _analizar(foto);
+  }
+
+  Future<void> _analizar(Uint8List foto) async {
     _foto = foto;
     _ficha = null;
+    _mensajeError = null;
     _cambiarPaso(PasoEscaner.analizando);
     try {
       _ficha = await _etiquetado.armarFicha(foto);
       _cambiarPaso(PasoEscaner.revisando);
     } on Exception {
-      _cambiarPaso(PasoEscaner.error);
+      _mostrarError(null);
     }
+  }
+
+  void _mostrarError(String? mensaje) {
+    _mensajeError = mensaje;
+    _cambiarPaso(PasoEscaner.error);
   }
 
   void cambiarNombre(String nombre) => _editar(nombre: nombre);
@@ -84,6 +129,7 @@ class EscanerViewModel extends ChangeNotifier {
   void empezarDeNuevo() {
     _foto = null;
     _ficha = null;
+    _mensajeError = null;
     _cambiarPaso(PasoEscaner.inicio);
   }
 

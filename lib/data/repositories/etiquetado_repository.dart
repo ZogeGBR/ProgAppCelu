@@ -15,8 +15,13 @@ class EtiquetadoRepository {
   final CamaraService _camara;
   final EtiquetadoService _etiquetado;
 
+  /// Null si la persona canceló; [ErrorDeFoto] si falló de verdad.
   Future<Uint8List?> tomarFoto({bool deGaleria = false}) =>
       _camara.tomarFoto(deGaleria: deGaleria);
+
+  /// La foto que quedó sin usar si Android cerró la app con la cámara
+  /// abierta (null si no había ninguna).
+  Future<Uint8List?> recuperarFotoPerdida() => _camara.recuperarPerdida();
 
   /// La foto propone nombre, categoría y descripción. El precio NO: lo
   /// pone siempre el dueño (aunque la IA del servidor sugiera uno).

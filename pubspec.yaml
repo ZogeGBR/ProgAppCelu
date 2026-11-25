@@ -37,6 +37,8 @@ dependencies:
   connectivity_plus: ^7.0.0
   # Historial de pedidos en el celular (SQLite, con DAO y migraciones).
   sqflite: ^2.4.2
+  # Armar la ruta del archivo de la base con el separador de cada sistema.
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
@@ -44,6 +46,8 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   # Probar el DAO de SQLite con una base en memoria en la computadora.
   sqflite_common_ffi: ^2.3.6
+  # Preferencias en memoria para las pruebas (InMemorySharedPreferencesAsync).
+  shared_preferences_platform_interface: ^2.4.1
   # Generan el ícono y la pantalla de arranque nativos de Android e iOS
   # (dart run flutter_launcher_icons / dart run flutter_native_splash:create).
   flutter_launcher_icons: ^0.14.4

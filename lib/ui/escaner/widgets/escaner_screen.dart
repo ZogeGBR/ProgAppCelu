@@ -40,7 +40,7 @@ class EscanerScreen extends StatelessWidget {
               onBoton: viewModel.empezarDeNuevo,
             ),
           PasoEscaner.error => VistaMensaje.error(
-              titulo: 'No pudimos leer la foto.',
+              titulo: viewModel.mensajeError ?? 'No pudimos leer la foto.',
               onReintentar: viewModel.empezarDeNuevo,
             ),
         },
@@ -75,13 +75,16 @@ class _Inicio extends StatelessWidget {
         ),
         const SizedBox(height: 32),
         FilledButton.icon(
-          onPressed: viewModel.sacarFoto,
+          // Deshabilitado mientras la cámara ya está abierta.
+          onPressed: viewModel.estaOcupado ? null : viewModel.sacarFoto,
           icon: const Icon(Icons.photo_camera),
           label: const Text('Sacar foto'),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => viewModel.sacarFoto(deGaleria: true),
+          onPressed: viewModel.estaOcupado
+              ? null
+              : () => viewModel.sacarFoto(deGaleria: true),
           icon: const Icon(Icons.photo_library_outlined),
           label: const Text('Elegir una foto guardada'),
         ),

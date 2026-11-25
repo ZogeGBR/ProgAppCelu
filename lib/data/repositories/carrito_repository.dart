@@ -1,9 +1,11 @@
-import 'dart:convert';
-
 import '../../domain/models/item_carrito.dart';
 import '../services/carrito_local_service.dart';
 
 /// Guarda y recupera el carrito del celular.
+///
+/// Convierte entre los ítems del dominio y las filas de la tabla `carrito`
+/// (toMap / fromMap). El orden de los renglones se guarda en la columna
+/// `orden`, que es cosa de la base y no del dominio.
 ///
 /// Si lo guardado está roto (por ejemplo, de una versión vieja de la app),
 /// se descarta en silencio: es mejor un carrito vacío que una app que no
@@ -14,20 +16,14 @@ class CarritoRepository {
 
   final CarritoLocalService _service;
 
-  Future<void> guardar(List<ItemCarrito> items) => _service.guardar(
-        jsonEncode([for (final item in items) item.toJsonLocal()]),
-      );
+  Future<void> guardar(List<ItemCarrito> items) => _service.guardar([
+        for (var i = 0; i < items.length; i++) {...items[i].toMap(), 'orden': i},
+      ]);
 
   Future<List<ItemCarrito>> cargar() async {
-    final guardado = await _service.leer();
-    if (guardado == null || guardado.isEmpty) return const [];
     try {
-      final lista = jsonDecode(guardado) as List<dynamic>;
-      return List.unmodifiable(
-        lista.map(
-          (item) => ItemCarrito.fromJsonLocal(item as Map<String, dynamic>),
-        ),
-      );
+      final filas = await _service.leer();
+      return List.unmodifiable(filas.map(ItemCarrito.fromMap));
     } on Object {
       return const [];
     }

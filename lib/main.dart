@@ -164,6 +164,8 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
         _seguimiento.restaurar(),
         _historial.cargar(),
         _conectividad.revisar(),
+        // Si Android cerró la app con la cámara abierta, la foto vuelve.
+        _escaner.recuperarFotoPerdida(),
       ]),
     );
     // Al tocar una notificación, la barra cambia de sección; acá se cierra

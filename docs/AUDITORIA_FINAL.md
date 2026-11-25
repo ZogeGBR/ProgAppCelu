@@ -127,7 +127,7 @@ release o en un iPhone.
 ## 5. Lo que queda (antes del 19/11)
 
 1. **Volver a correr las pruebas en la PC**, después de `git pull`:
-   `flutter analyze` y `flutter test` (deberían ser **180**). Es la única
+   `flutter analyze` y `flutter test` (deberían ser **200**). Es la única
    forma de confirmar los cambios de esta auditoría, porque acá no hay
    Flutter.
 2. **Volver a generar el APK** (`flutter build apk --release`), para que

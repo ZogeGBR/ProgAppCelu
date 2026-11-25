@@ -27,6 +27,35 @@ class ItemCarrito {
         'cantidad': cantidad,
       };
 
+  /// Fila de la tabla `carrito` de SQLite (convención de la teoría: toMap
+  /// y fromMap). En SQL las columnas van con guion bajo y no hay bool:
+  /// `disponible` va como 1 o 0.
+  Map<String, Object?> toMap() => {
+        'producto_id': producto.id,
+        'nombre': producto.nombre,
+        'precio': producto.precio,
+        'categoria': producto.categoria,
+        'emoji': producto.emoji,
+        'descripcion': producto.descripcion,
+        'disponible': producto.disponible ? 1 : 0,
+        'cantidad': cantidad,
+      };
+
+  /// Fila de SQLite -> ítem. `as num` sirve si el precio llega como 1500 o
+  /// 1500.0 (`as double` fallaría con un entero).
+  factory ItemCarrito.fromMap(Map<String, Object?> fila) => ItemCarrito(
+        producto: Producto(
+          id: fila['producto_id']! as String,
+          nombre: fila['nombre']! as String,
+          precio: (fila['precio']! as num).toDouble(),
+          categoria: fila['categoria']! as String,
+          emoji: fila['emoji'] as String? ?? Producto.emojiPorDefecto,
+          descripcion: fila['descripcion'] as String? ?? '',
+          disponible: fila['disponible'] != 0,
+        ),
+        cantidad: fila['cantidad']! as int,
+      );
+
   /// Para el backend: solo lo necesario (el precio lo vuelve a calcular él).
   Map<String, dynamic> toJson() => {
         'productoId': producto.id,

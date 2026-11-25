@@ -45,7 +45,10 @@ void main() {
     });
 
     test('si lo guardado está roto, arranca vacío sin romperse', () async {
-      disco = CarritoLocalServiceMemoria('esto no es json');
+      // Una fila de una versión vieja, con columnas que ya no existen.
+      disco = CarritoLocalServiceMemoria([
+        {'producto': 'esto ya no es una fila del carrito'},
+      ]);
 
       final carrito = nuevoCarrito();
       await carrito.restaurar();

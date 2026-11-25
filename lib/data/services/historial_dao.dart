@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Historial de pedidos en el celular, con SQLite (sqflite).
+import 'base_local.dart';
+
+/// Historial de pedidos en el celular.
 ///
 /// Patrón DAO (Data Access Object): esta clase concentra TODO el SQL de la
 /// tabla `pedidos`. El resto de la app solo llama a [guardar], [ultimos] y
@@ -20,43 +22,16 @@ abstract interface class HistorialService {
 }
 
 class HistorialDao implements HistorialService {
-  /// [fabrica] se inyecta (como las capacidades y políticas): en el
-  /// celular es la de sqflite; en las pruebas, `databaseFactoryFfi` con una
-  /// base en memoria. El soporte de SQLite cambia según la plataforma.
-  HistorialDao({
-    DatabaseFactory? fabrica,
-    String? ruta,
-  })  : _fabrica = fabrica ?? databaseFactorySqflitePlugin,
-        _ruta = ruta;
+  /// Recibe la [base] compartida. [fabrica] y [ruta] son un atajo para las
+  /// pruebas: arman una base propia.
+  HistorialDao({BaseLocal? base, DatabaseFactory? fabrica, String? ruta})
+      : _base = base ?? BaseLocal(fabrica: fabrica, ruta: ruta);
 
   static const tabla = 'pedidos';
-  static const version = 2;
-  static const _nombreArchivo = 'freshmarket.db';
 
-  final DatabaseFactory _fabrica;
-  final String? _ruta;
-  Future<Database>? _base;
+  final BaseLocal _base;
 
-  // Se abre una sola vez, la primera vez que se usa.
-  Future<Database> get _abierta => _base ??= _abrir();
-
-  Future<Database> _abrir() async {
-    final ruta =
-        _ruta ?? '${await _fabrica.getDatabasesPath()}/$_nombreArchivo';
-    return _fabrica.openDatabase(
-      ruta,
-      options: OpenDatabaseOptions(
-        version: version,
-        // onCreate corre UNA sola vez: cuando el archivo no existía.
-        onCreate: (base, _) => crearTablas(base),
-        // onUpgrade: celulares que ya tenían la versión 1 instalada. Sin
-        // esto, "no such column: direccion" (onCreate no se repite).
-        onUpgrade: (base, anterior, _) => migrar(base, anterior),
-      ),
-    );
-  }
-
-  static Future<void> crearTablas(Database base) async {
+  static Future<void> crearTabla(Database base) async {
     // SQLite no tiene bool ni DATE: la fecha va como TEXT (ISO 8601).
     await base.execute('''
       CREATE TABLE $tabla (
@@ -72,18 +47,9 @@ class HistorialDao implements HistorialService {
     await base.execute('CREATE INDEX idx_pedidos_fecha ON $tabla (fecha)');
   }
 
-  static Future<void> migrar(Database base, int versionAnterior) async {
-    // Versión 1 -> 2: se agregó la dirección de entrega.
-    if (versionAnterior < 2) {
-      await base.execute(
-        "ALTER TABLE $tabla ADD COLUMN direccion TEXT NOT NULL DEFAULT ''",
-      );
-    }
-  }
-
   @override
   Future<void> guardar(Map<String, Object?> fila) async {
-    final base = await _abierta;
+    final base = await _base.abierta;
     // El mismo pedido dos veces (por ejemplo, el aviso llegó repetido)
     // reemplaza a la fila anterior en vez de duplicarla.
     await base.insert(
@@ -95,13 +61,13 @@ class HistorialDao implements HistorialService {
 
   @override
   Future<List<Map<String, Object?>>> ultimos({int limite = 20}) async {
-    final base = await _abierta;
+    final base = await _base.abierta;
     return base.query(tabla, orderBy: 'fecha DESC', limit: limite);
   }
 
   @override
   Future<int> borrarAnterioresA(DateTime fecha) async {
-    final base = await _abierta;
+    final base = await _base.abierta;
     // Siempre con "?": nunca se pega texto dentro del SQL (inyección SQL).
     // Y nunca un DELETE sin WHERE: borraría toda la tabla.
     return base.delete(
@@ -111,11 +77,7 @@ class HistorialDao implements HistorialService {
     );
   }
 
-  Future<void> cerrar() async {
-    final base = _base;
-    _base = null;
-    if (base != null) await (await base).close();
-  }
+  Future<void> cerrar() => _base.cerrar();
 }
 
 /// En memoria: para la Web (donde SQLite no existe) y las pruebas de

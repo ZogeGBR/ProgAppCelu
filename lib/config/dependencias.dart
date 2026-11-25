@@ -14,6 +14,7 @@ import '../data/repositories/ubicacion_entrega_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/avisos_service.dart';
 import '../data/services/camara_service.dart';
+import '../data/services/base_local.dart';
 import '../data/services/carrito_local_service.dart';
 import '../data/services/catalogo_service.dart';
 import '../data/services/conectividad_service.dart';
@@ -25,6 +26,7 @@ import '../data/services/historial_dao.dart';
 import '../data/services/notificacion_local_service.dart';
 import '../data/services/pago_service.dart';
 import '../data/services/pedido_local_service.dart';
+import '../data/services/preferencias.dart';
 import '../data/services/push_service.dart';
 import '../data/services/recordatorio_service.dart';
 import '../data/services/reparto_service.dart';
@@ -76,10 +78,24 @@ class Dependencias {
 
   /// SQLite en el celular; en Web (donde no existe) el historial vive en
   /// memoria. La decisión la toma la política, no un `if` suelto.
-  static HistorialService _historialSegun(Politicas politicas) =>
+  static HistorialService _historialSegun(
+    Politicas politicas,
+    BaseLocal base,
+  ) =>
       politicas.puedeGuardarHistorial
-          ? HistorialDao()
+          ? HistorialDao(base: base)
           : HistorialServiceMemoria();
+
+  /// El carrito, igual: en el celular una tabla de SQLite (la misma base
+  /// que el historial); en la Web, donde no hay SQLite, preferencias.
+  static CarritoLocalService _carritoSegun(
+    Politicas politicas,
+    BaseLocal base,
+    Preferencias preferencias,
+  ) =>
+      politicas.puedeGuardarHistorial
+          ? CarritoDao(base: base)
+          : CarritoLocalServicePreferencias(preferencias);
 
   /// [hayFirebase]: si Firebase arrancó (ver main.dart). Sin Firebase la app
   /// anda igual, pero sin notificaciones push del backend.
@@ -97,6 +113,11 @@ class Dependencias {
     }
 
     final api = ApiClient(urlBase: AppConfig.urlBackend);
+    // Lo que se guarda en el celular: una sola base SQLite para todas las
+    // tablas y una sola puerta a las preferencias.
+    final baseLocal = BaseLocal();
+    final preferencias = Preferencias();
+    final politicas = Politicas();
     final catalogo = CatalogoRepository(service: CatalogoServiceHttp(api));
     final sesion = SesionRepository(service: SesionServiceHttp(api));
     // Observer: el cliente HTTP usa el token de quien haya ingresado.
@@ -105,7 +126,7 @@ class Dependencias {
       catalogo: catalogo,
       seguimiento: SeguimientoRepository(
         service: SeguimientoServiceHttp(api),
-        guardado: const PedidoLocalServicePreferencias(),
+        guardado: PedidoLocalServicePreferencias(preferencias),
       ),
       etiquetado: EtiquetadoRepository(
         camara: CamaraServiceImagePicker(),
@@ -121,7 +142,7 @@ class Dependencias {
         ubicacion: const UbicacionServiceGeolocator(),
       ),
       carrito: CarritoRepository(
-        service: const CarritoLocalServicePreferencias(),
+        service: _carritoSegun(politicas, baseLocal, preferencias),
       ),
       ubicacionEntrega: UbicacionEntregaRepository(
         geocodificacion: GeocodificacionServiceHttp(api),
@@ -140,7 +161,9 @@ class Dependencias {
       conectividad: ConectividadRepository(service: ConectividadServicePlus()),
       recordatorios:
           RecordatoriosRepository(service: RecordatorioServicePlugin()),
-      historial: HistorialRepository(service: _historialSegun(Politicas())),
+      historial: HistorialRepository(
+        service: _historialSegun(politicas, baseLocal),
+      ),
     );
   }
 
@@ -169,6 +192,9 @@ class Dependencias {
   }) {
     // El "servidor" de la demo manda los avisos por este push simulado.
     final pushDemo = PushServiceSimulado();
+    final baseLocal = BaseLocal();
+    final preferencias = Preferencias();
+    final politicas = Politicas();
     return Dependencias(
       catalogo: CatalogoRepository(
         service: catalogoService ?? CatalogoServiceLocal(),
@@ -177,7 +203,8 @@ class Dependencias {
         service:
             seguimientoService ??
                 SeguimientoServiceSimulado(push: pushDemo, rutas: rutaService),
-        guardado: pedidoLocalService ?? const PedidoLocalServicePreferencias(),
+        guardado:
+            pedidoLocalService ?? PedidoLocalServicePreferencias(preferencias),
       ),
       etiquetado: EtiquetadoRepository(
         camara: camara ?? CamaraServiceImagePicker(),
@@ -196,7 +223,8 @@ class Dependencias {
         ubicacion: ubicacionService ?? const UbicacionServiceGeolocator(),
       ),
       carrito: CarritoRepository(
-        service: carritoLocalService ?? const CarritoLocalServicePreferencias(),
+        service: carritoLocalService ??
+            _carritoSegun(politicas, baseLocal, preferencias),
       ),
       ubicacionEntrega: UbicacionEntregaRepository(
         geocodificacion:
@@ -218,7 +246,7 @@ class Dependencias {
         service: recordatorioService ?? RecordatorioServicePlugin(),
       ),
       historial: HistorialRepository(
-        service: historialService ?? _historialSegun(Politicas()),
+        service: historialService ?? _historialSegun(politicas, baseLocal),
       ),
       pistaClaves: 'Demo: ${SesionServiceSimulado.emailDueno} o '
           '${SesionServiceSimulado.emailRepartidor}, contraseña '

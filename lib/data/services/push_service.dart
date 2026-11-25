@@ -24,7 +24,8 @@ import 'preferencias.dart';
 @pragma('vm:entry-point')
 Future<void> manejarPushEnSegundoPlano(RemoteMessage mensaje) async {
   await Firebase.initializeApp();
-  await const Preferencias().guardar(
+  // En este isolate no existe nada de la app: crea su propio acceso.
+  await Preferencias().guardar(
     Preferencias.claveUltimoAvisoEnSegundoPlano,
     jsonEncode({
       ...mensaje.data,

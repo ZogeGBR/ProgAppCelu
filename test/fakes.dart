@@ -19,6 +19,7 @@ import 'package:freshmarket_app/data/services/reparto_service.dart';
 import 'package:freshmarket_app/data/services/seguimiento_service.dart';
 import 'package:freshmarket_app/data/services/sesion_service.dart';
 import 'package:freshmarket_app/data/services/ubicacion_service.dart';
+import 'package:freshmarket_app/domain/models/error_de_foto.dart';
 import 'package:freshmarket_app/domain/models/aviso.dart';
 import 'package:freshmarket_app/domain/models/posicion.dart';
 import 'package:freshmarket_app/domain/models/producto.dart';
@@ -238,12 +239,32 @@ class SeguimientoServiceFalso implements SeguimientoService {
 }
 
 class CamaraFalsa implements CamaraService {
-  CamaraFalsa({this.foto});
+  CamaraFalsa({this.foto, this.perdida});
 
   Uint8List? foto;
 
+  /// La foto que "quedó" si Android cerró la app con la cámara abierta.
+  Uint8List? perdida;
+
+  /// Si no es null, tomarFoto falla con este error.
+  ErrorDeFoto? error;
+
+  int vecesAbierta = 0;
+
   @override
-  Future<Uint8List?> tomarFoto({bool deGaleria = false}) async => foto;
+  Future<Uint8List?> tomarFoto({bool deGaleria = false}) async {
+    vecesAbierta++;
+    final error = this.error;
+    if (error != null) throw error;
+    return foto;
+  }
+
+  @override
+  Future<Uint8List?> recuperarPerdida() async {
+    final foto = perdida;
+    perdida = null; // image_picker la entrega una sola vez.
+    return foto;
+  }
 }
 
 class EtiquetadoServiceFalso implements EtiquetadoService {
