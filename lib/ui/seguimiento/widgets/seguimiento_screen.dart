@@ -298,16 +298,23 @@ class _FilaResumen extends StatelessWidget {
   Widget build(BuildContext context) {
     final estilo = destacado
         ? Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            )
+      fontWeight: FontWeight.bold,
+    )
         : null;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(etiqueta, style: estilo),
-          Text(valor, style: estilo),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              valor,
+              style: estilo,
+              textAlign: TextAlign.end,
+            ),
+          ),
         ],
       ),
     );
