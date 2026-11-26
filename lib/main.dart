@@ -154,7 +154,7 @@ class _FreshMarketAppState extends State<FreshMarketApp> {
       repositorio: dependencias.historial,
       pagos: dependencias.pago,
     );
-    // Al abrir: cinco tareas independientes. Con Future.wait corren en
+    // Al abrir: seis tareas independientes. Con Future.wait corren en
     // paralelo y el arranque tarda lo que la más lenta, no la suma. (Si
     // la app se cerró con un pedido en viaje, "Mi pedido" lo retoma.)
     unawaited(

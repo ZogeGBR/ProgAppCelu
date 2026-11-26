@@ -62,7 +62,7 @@ Presentación del 19/11 · 10 minutos de demo + preguntas.
 5. **¿`async` saca el trabajo del hilo principal?** — No. Solo libera el hilo
    mientras espera. Para *calcular* algo pesado (la foto a base64) usamos
    `Isolate.run`.
-6. **¿Por qué `Future.wait` en el arranque?** — Son cinco cargas
+6. **¿Por qué `Future.wait` en el arranque?** — Son seis cargas
    independientes: en paralelo tarda la más lenta, no la suma.
 7. **¿Qué pasa si se olvida un `await`?** — El `try` termina antes que el
    Future y el error no pasa por el `catch`: la app marcaría "éxito" sin
